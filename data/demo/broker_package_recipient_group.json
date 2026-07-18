@@ -1,0 +1,9 @@
+{
+  "id": "recipient-group-broker-package-cobalt-v1",
+  "building_id": "bld-cobalt",
+  "purpose": "broker_package",
+  "recipient_name": "Alex Chen",
+  "recipient_organization": "Northbridge Advisory",
+  "to": ["alex.chen@northbridge-demo.example"],
+  "cc": ["james.kim@leaseflow-demo.example"]
+}

@@ -26,14 +26,14 @@ export const RequestSchema = z.object({
     text: z.string(),
     resolved_building_id: z.string().nullable(),
     confidence: z.number().min(0).max(1),
-  })),
+  }).strict()).min(1),
   floor: z.string().nullable(),
-  requested_fields: z.array(z.string()),
-  requested_files: z.array(z.string()),
-  recipient: z.object({name: z.string().nullable(), organization: z.string().nullable()}),
+  requested_fields: z.array(z.enum(["marketed_area", "rent_free", "supported_parking"])),
+  requested_files: z.array(z.enum(["current_floor_plan"])),
+  recipient: z.object({name: z.string().nullable(), organization: z.string().nullable()}).strict(),
   deadline: z.string().nullable(),
-  ambiguities: z.array(z.object({field: z.string(), reason: z.string()})),
-});
+  ambiguities: z.array(z.object({field: z.string(), reason: z.string()}).strict()),
+}).strict();
 
 export const ReportPatchSchema = z.object({
   target_building_ids: z.array(z.string()),
@@ -53,9 +53,14 @@ export const ReportPatchSchema = z.object({
   unresolved: z.array(z.object({field: z.string(), question: z.string()})),
 });
 
+export const PackageEditSchema = z.object({
+  tone: z.enum(["neutral", "concise_courteous", "formal"]),
+}).strict();
+
 export type SourceCandidate = z.infer<typeof SourceCandidateSchema>;
 export type ParsedRequest = z.infer<typeof RequestSchema>;
 export type ReportPatch = z.infer<typeof ReportPatchSchema>;
+export type PackageEdit = z.infer<typeof PackageEditSchema>;
 
 export function createOpenAIClient(apiKey = process.env.OPENAI_API_KEY): OpenAI {
   if (!apiKey) throw new Error("OPENAI_API_KEY is required for live GPT-5.6 calls.");

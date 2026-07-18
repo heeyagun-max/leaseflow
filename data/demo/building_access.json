@@ -1,0 +1,9 @@
+{
+  "configuration_id": "building-access-demo-v1",
+  "users": [
+    {
+      "user_id": "usr-manager",
+      "building_ids": ["bld-cobalt"]
+    }
+  ]
+}

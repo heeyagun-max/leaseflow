@@ -155,7 +155,7 @@ export function canPerform(role: UserRole, action: string): boolean {
   const permissions: Record<UserRole, string[]> = {
     data_steward: ["source.upload", "candidate.confirm"],
     senior_reviewer: ["candidate.review", "record.publish"],
-    lm_manager: ["package.prepare", "package.approve", "report.approve"],
+    lm_manager: ["package.prepare", "package.approve", "package.send", "report.approve"],
     lm_member: ["package.prepare", "report.prepare"],
     team_lead: ["package.prepare", "report.prepare", "report.approve"],
     admin: ["*"],
@@ -533,4 +533,363 @@ export function canSendExternal(input: {
   return [...input.facts, ...input.files].every(
     (item) => item.status === "published" && !item.superseded && item.external_shareable,
   );
+}
+
+export const REQUESTED_FIELDS = ["marketed_area", "rent_free", "supported_parking"] as const;
+export const REQUESTED_FILES = ["current_floor_plan"] as const;
+export type RequestedField = (typeof REQUESTED_FIELDS)[number];
+export type RequestedFile = (typeof REQUESTED_FILES)[number];
+
+export interface OperationalRequestExtraction {
+  language: "ko" | "en" | "mixed";
+  building_mentions: Array<{ text: string; resolved_building_id: string | null; confidence: number }>;
+  floor: string | null;
+  requested_fields: RequestedField[];
+  requested_files: RequestedFile[];
+  recipient: { name: string | null; organization: string | null };
+  deadline: string | null;
+  ambiguities: Array<{ field: string; reason: string }>;
+}
+
+export interface OperationalRequest {
+  id: string;
+  source: "call" | "email";
+  source_id: string;
+  raw_text: string;
+  extraction: OperationalRequestExtraction;
+  status: "candidate" | "confirmed";
+  imported_at: string;
+  confirmed_at: string | null;
+}
+
+export interface PackageFact {
+  field: RequestedField;
+  label: string;
+  value: number;
+  unit: "py" | "months" | "spaces";
+  version_id: string;
+  source_pointer: string;
+}
+
+export interface PackageFile {
+  requested_file: RequestedFile;
+  filename: string;
+  version_id: string;
+  source_pointer: string;
+}
+
+export interface OperationalPackage {
+  id: string;
+  request_id: string;
+  building_id: string;
+  floor: string;
+  status: "draft" | "edit_pending" | "approved" | "sent" | "stale";
+  subject: string;
+  body: string;
+  facts: PackageFact[];
+  files: PackageFile[];
+  recipients: { to: string[]; cc: string[]; configuration_id: string };
+  unresolved: string[];
+  edit_candidate: { subject: string; body: string; instruction: string } | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  sent_at: string | null;
+  idempotency_key: string | null;
+}
+
+export interface OperationalActivity {
+  id: string;
+  event_type: "package.sent.sandbox";
+  package_id: string;
+  building_id: string;
+  occurred_at: string;
+  summary: string;
+}
+
+export interface OperationalAuditEvent {
+  id: string;
+  event_type:
+    | "request.imported"
+    | "request.confirmed"
+    | "package.drafted"
+    | "package.edit_proposed"
+    | "package.edit_accepted"
+    | "package.edit_rejected"
+    | "package.approved"
+    | "package.sent.sandbox";
+  actor_id: string;
+  actor_role: UserRole;
+  entity_id: string;
+  occurred_at: string;
+  metadata: Record<string, string | number | boolean | null>;
+}
+
+export interface OperationalState {
+  requests: OperationalRequest[];
+  packages: OperationalPackage[];
+  activities: OperationalActivity[];
+  audit: OperationalAuditEvent[];
+}
+
+export interface DraftMaterial {
+  building_id: string;
+  building_name: string;
+  floor: string;
+  facts: PackageFact[];
+  files: PackageFile[];
+}
+
+export type PackageMessageTone = "neutral" | "concise_courteous" | "formal";
+
+export function renderProtectedPackageMaterial(
+  facts: readonly PackageFact[],
+  files: readonly PackageFile[],
+): string {
+  return [
+    "--- PROTECTED PUBLISHED MATERIAL ---",
+    ...facts.map((fact) => `${fact.label}: ${fact.value} ${fact.unit} | version=${fact.version_id} | source=${fact.source_pointer}`),
+    ...files.map((file) => `Attachment: ${file.filename} | version=${file.version_id} | source=${file.source_pointer}`),
+    "--- END PROTECTED PUBLISHED MATERIAL ---",
+  ].join("\n");
+}
+
+export function renderOperationalPackageBody(
+  facts: readonly PackageFact[],
+  files: readonly PackageFile[],
+  tone: PackageMessageTone,
+): string {
+  const copy = {
+    neutral: ["Current published leasing information is provided below.", "Please review the attached current floor plan."],
+    concise_courteous: ["Hello, please find the current published leasing information below.", "Thank you."],
+    formal: ["Please find below the currently published and authorized leasing information.", "Kind regards,\nLeaseFlow Demo"],
+  } as const;
+  return `${copy[tone][0]}\n\n${renderProtectedPackageMaterial(facts, files)}\n\n${copy[tone][1]}`;
+}
+
+export function assertOperationalPackageContentIntegrity(pkg: OperationalPackage): void {
+  const allowedBodies = (["neutral", "concise_courteous", "formal"] as const)
+    .map((tone) => renderOperationalPackageBody(pkg.facts, pkg.files, tone));
+  if (!allowedBodies.includes(pkg.body)) {
+    throw new Error("Package protected published material was altered or unapproved factual content was introduced.");
+  }
+  if (pkg.edit_candidate) {
+    if (pkg.edit_candidate.subject !== pkg.subject || !allowedBodies.includes(pkg.edit_candidate.body)) {
+      throw new Error("Package edit attempted to alter protected subject or published material.");
+    }
+  }
+}
+
+export function createInitialOperationalState(): OperationalState {
+  return { requests: [], packages: [], activities: [], audit: [] };
+}
+
+function operationalAudit(
+  state: OperationalState,
+  event: Omit<OperationalAuditEvent, "id">,
+): OperationalAuditEvent {
+  return { ...event, id: `op-audit-${state.audit.length + 1}` };
+}
+
+function requireOperationalActor(actor: { id: string; role: UserRole }, action: string): void {
+  if (!canPerform(actor.role, action)) throw new Error(`Role ${actor.role} is not allowed to perform ${action}.`);
+}
+
+export function importOperationalRequest(
+  state: OperationalState,
+  input: Omit<OperationalRequest, "status" | "imported_at" | "confirmed_at">,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.prepare");
+  if (state.requests.some((request) => request.id === input.id)) throw new Error(`Request ${input.id} already exists.`);
+  const request: OperationalRequest = { ...input, status: "candidate", imported_at: occurredAt, confirmed_at: null };
+  return {
+    ...state,
+    requests: [...state.requests, request],
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "request.imported", actor_id: actor.id, actor_role: actor.role,
+      entity_id: request.id, occurred_at: occurredAt, metadata: { source: request.source },
+    })],
+  };
+}
+
+export function confirmOperationalRequest(
+  state: OperationalState,
+  requestId: string,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.prepare");
+  const request = state.requests.find((item) => item.id === requestId);
+  if (!request) throw new Error(`Unknown request: ${requestId}.`);
+  if (request.extraction.ambiguities.length > 0
+    || !request.extraction.floor
+    || request.extraction.building_mentions.length !== 1
+    || !request.extraction.building_mentions[0]?.resolved_building_id) {
+    throw new Error("Request confirmation is blocked until all ambiguities are resolved.");
+  }
+  return {
+    ...state,
+    requests: state.requests.map((item) => item.id === requestId
+      ? { ...item, status: "confirmed" as const, confirmed_at: occurredAt }
+      : item),
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "request.confirmed", actor_id: actor.id, actor_role: actor.role,
+      entity_id: requestId, occurred_at: occurredAt, metadata: {},
+    })],
+  };
+}
+
+export function draftOperationalPackage(
+  state: OperationalState,
+  requestId: string,
+  material: DraftMaterial,
+  recipients: OperationalPackage["recipients"],
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.prepare");
+  const request = state.requests.find((item) => item.id === requestId);
+  if (!request || request.status !== "confirmed") throw new Error("Only a confirmed request can be drafted.");
+  if (state.packages.some((item) => item.request_id === requestId)) throw new Error("A package already exists for this request.");
+  const resolved = request.extraction.building_mentions[0]?.resolved_building_id;
+  if (resolved !== material.building_id || request.extraction.floor !== material.floor) {
+    throw new Error("Published material does not match the confirmed request scope.");
+  }
+  const facts = request.extraction.requested_fields.map((field) => {
+    const fact = material.facts.find((item) => item.field === field);
+    if (!fact) throw new Error(`No current published fact is available for ${field}.`);
+    return fact;
+  });
+  const files = request.extraction.requested_files.map((requestedFile) => {
+    const file = material.files.find((item) => item.requested_file === requestedFile);
+    if (!file) throw new Error(`No current published file is available for ${requestedFile}.`);
+    return file;
+  });
+  if (recipients.to.length === 0) throw new Error("Configured package recipients require at least one To address.");
+  const packageId = `pkg-${request.id}`;
+  const packageDraft: OperationalPackage = {
+    id: packageId, request_id: request.id, building_id: material.building_id, floor: material.floor,
+    status: "draft", subject: `[LeaseFlow] ${material.building_name} ${material.floor} leasing package`,
+    body: renderOperationalPackageBody(facts, files, "neutral"),
+    facts, files, recipients, unresolved: [], edit_candidate: null,
+    approved_by: null, approved_at: null, sent_at: null, idempotency_key: null,
+  };
+  return {
+    ...state,
+    packages: [...state.packages, packageDraft],
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "package.drafted", actor_id: actor.id, actor_role: actor.role,
+      entity_id: packageId, occurred_at: occurredAt, metadata: { fact_count: facts.length, file_count: files.length },
+    })],
+  };
+}
+
+export function proposePackageEdit(
+  state: OperationalState,
+  packageId: string,
+  edit: { subject: string; body: string; instruction: string },
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.prepare");
+  const target = state.packages.find((item) => item.id === packageId);
+  if (!target || target.status !== "draft") throw new Error("Only a draft package can receive an edit candidate.");
+  assertOperationalPackageContentIntegrity({ ...target, edit_candidate: edit });
+  return {
+    ...state,
+    packages: state.packages.map((item) => item.id === packageId
+      ? { ...item, status: "edit_pending" as const, edit_candidate: { ...edit } }
+      : item),
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "package.edit_proposed", actor_id: actor.id, actor_role: actor.role,
+      entity_id: packageId, occurred_at: occurredAt, metadata: { instruction: edit.instruction },
+    })],
+  };
+}
+
+export function decidePackageEdit(
+  state: OperationalState,
+  packageId: string,
+  decision: "accept" | "reject",
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.prepare");
+  const target = state.packages.find((item) => item.id === packageId);
+  if (!target || target.status !== "edit_pending" || !target.edit_candidate) throw new Error("No edit candidate is pending.");
+  assertOperationalPackageContentIntegrity(target);
+  return {
+    ...state,
+    packages: state.packages.map((item) => item.id !== packageId ? item : {
+      ...item, status: "draft" as const,
+      subject: decision === "accept" ? target.edit_candidate!.subject : item.subject,
+      body: decision === "accept" ? target.edit_candidate!.body : item.body,
+      edit_candidate: null,
+    }),
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: decision === "accept" ? "package.edit_accepted" : "package.edit_rejected",
+      actor_id: actor.id, actor_role: actor.role, entity_id: packageId, occurred_at: occurredAt, metadata: {},
+    })],
+  };
+}
+
+export function approveOperationalPackage(
+  state: OperationalState,
+  packageId: string,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.approve");
+  const target = state.packages.find((item) => item.id === packageId);
+  if (!target || target.status !== "draft" || target.unresolved.length > 0) throw new Error("Only a complete draft package can be approved.");
+  assertOperationalPackageContentIntegrity(target);
+  return {
+    ...state,
+    packages: state.packages.map((item) => item.id === packageId
+      ? { ...item, status: "approved" as const, approved_by: actor.id, approved_at: occurredAt }
+      : item),
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "package.approved", actor_id: actor.id, actor_role: actor.role,
+      entity_id: packageId, occurred_at: occurredAt, metadata: {},
+    })],
+  };
+}
+
+export function sendOperationalPackage(
+  state: OperationalState,
+  packageId: string,
+  idempotencyKey: string,
+  currentVersionIds: ReadonlySet<string>,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): OperationalState {
+  requireOperationalActor(actor, "package.send");
+  const reusedKey = state.packages.find((item) => item.idempotency_key === idempotencyKey && item.id !== packageId);
+  if (reusedKey) throw new Error("Idempotency key is already assigned to another package.");
+  const target = state.packages.find((item) => item.id === packageId);
+  if (!target) throw new Error(`Unknown package: ${packageId}.`);
+  assertOperationalPackageContentIntegrity(target);
+  if (target.status === "sent" && target.idempotency_key === idempotencyKey) return state;
+  if (target.status !== "approved") throw new Error("Package send is blocked until LM Manager approval.");
+  const referencedIds = [...target.facts.map((fact) => fact.version_id), ...target.files.map((file) => file.version_id)];
+  if (referencedIds.some((id) => !currentVersionIds.has(id))) {
+    throw new Error("Package send is blocked because a referenced published version is stale.");
+  }
+  const activity: OperationalActivity = {
+    id: `activity-${state.activities.length + 1}`, event_type: "package.sent.sandbox",
+    package_id: packageId, building_id: target.building_id, occurred_at: occurredAt,
+    summary: `Sandbox package sent to ${target.recipients.to.join(", ")}.`,
+  };
+  return {
+    ...state,
+    packages: state.packages.map((item) => item.id === packageId
+      ? { ...item, status: "sent" as const, sent_at: occurredAt, idempotency_key: idempotencyKey }
+      : item),
+    activities: [...state.activities, activity],
+    audit: [...state.audit, operationalAudit(state, {
+      event_type: "package.sent.sandbox", actor_id: actor.id, actor_role: actor.role,
+      entity_id: packageId, occurred_at: occurredAt, metadata: { idempotency_key: idempotencyKey },
+    })],
+  };
 }

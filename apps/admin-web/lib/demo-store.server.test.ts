@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SourceCandidateSchema } from "@leaseflow/ai";
+import { renderOperationalPackageBody } from "@leaseflow/domain";
 import {
   createInitialDemoState,
   createMobilePublishedSnapshot,
@@ -12,6 +13,7 @@ import {
   type DemoRecord,
 } from "@leaseflow/demo-data";
 import { DemoFileStore } from "./demo-store.server";
+import { demoRequestExtraction } from "./request-extraction.server";
 
 const tempDirectories: string[] = [];
 
@@ -74,7 +76,7 @@ describe("persistent governed demo store", () => {
   });
 
   it("resets deterministically and rejects stale revisions", async () => {
-    const { store } = await storeFixture();
+    const { store, statePath } = await storeFixture();
     const initial = await store.getState();
     const extracted = await store.extract({actor_id:"usr-junior",expected_revision:0}, demoExtractionResult);
     await expect(store.confirm({actor_id:"usr-junior",expected_revision:0})).rejects.toThrow(/Revision conflict/);
@@ -154,5 +156,118 @@ describe("persistent governed demo store", () => {
       floor_plan: { filename: "CFC_5F_plan_v1.svg" },
       blocked_floor_plans: [],
     });
+  });
+
+  it("persists the governed mobile package flow without changing official data", async () => {
+    const { store, statePath } = await storeFixture();
+    const extracted = await store.extract({ actor_id: "usr-junior", expected_revision: 0 }, demoExtractionResult);
+    const confirmed = await store.confirm({ actor_id: "usr-junior", expected_revision: extracted.revision });
+    const published = await store.publish({ actor_id: "usr-senior", expected_revision: confirmed.revision });
+    const officialBefore = { records: published.records, files: published.files, stage: published.stage, candidates: published.candidates };
+    const imported = await store.importRequest({
+      actor_id: "usr-manager", expected_revision: published.revision, request_id: "request-call-1", source: "call",
+      source_id: "activity-call-cobalt", raw_text: "synthetic request", extraction: demoRequestExtraction("call"),
+    });
+    const requestConfirmed = await store.confirmRequest({ actor_id: "usr-manager", expected_revision: imported.revision, request_id: "request-call-1" });
+    const drafted = await store.draftPackage({ actor_id: "usr-manager", expected_revision: requestConfirmed.revision, request_id: "request-call-1" });
+    expect(drafted.operations.packages[0]).toMatchObject({
+      status: "draft",
+      facts: [
+        { field: "marketed_area", value: 200, version_id: "av-cobalt-5f-v2" },
+        { field: "rent_free", value: 2, version_id: "term-cobalt-rf-v2" },
+        { field: "supported_parking", value: 2, version_id: "term-cobalt-park-v2" },
+      ],
+      files: [{ filename: "CFC_5F_plan_v2.svg", version_id: "file-cobalt-plan-v2" }],
+      recipients: { configuration_id: "recipient-group-broker-package-cobalt-v1", to: ["alex.chen@northbridge-demo.example"] },
+      unresolved: [],
+    });
+    await expect(store.sendPackage({ actor_id: "usr-manager", expected_revision: drafted.revision, package_id: "pkg-request-call-1", idempotency_key: "sandbox-send-1" })).rejects.toThrow(/approval/);
+    const approved = await store.approvePackage({ actor_id: "usr-manager", expected_revision: drafted.revision, package_id: "pkg-request-call-1" });
+    const [sentA, sentB] = await Promise.all([
+      store.sendPackage({ actor_id: "usr-manager", expected_revision: approved.revision, package_id: "pkg-request-call-1", idempotency_key: "sandbox-send-1" }),
+      store.sendPackage({ actor_id: "usr-manager", expected_revision: approved.revision, package_id: "pkg-request-call-1", idempotency_key: "sandbox-send-1" }),
+    ]);
+    expect(sentA.operations.activities).toHaveLength(1);
+    expect(sentB.operations.activities).toHaveLength(1);
+    const reloaded = await new DemoFileStore(statePath).getState();
+    expect(reloaded.operations.activities).toHaveLength(1);
+    expect({ records: reloaded.records, files: reloaded.files, stage: reloaded.stage, candidates: reloaded.candidates }).toEqual(officialBefore);
+    const reset = await store.reset({ actor_id: "usr-manager", expected_revision: reloaded.revision, occurred_at: "2026-07-18T12:00:00.000Z" });
+    expect(reset.revision).toBe(reloaded.revision + 1);
+    expect(reset.operations).toEqual({ requests: [], packages: [], activities: [], audit: [] });
+    expect(reset.audit.at(-1)?.event_type).toBe("demo.reset");
+  });
+
+  it("rejects protected-material edits and configuration divergence without changing state", async () => {
+    const { store, statePath } = await storeFixture();
+    const extracted = await store.extract({ actor_id: "usr-junior", expected_revision: 0 }, demoExtractionResult);
+    const confirmed = await store.confirm({ actor_id: "usr-junior", expected_revision: extracted.revision });
+    const published = await store.publish({ actor_id: "usr-senior", expected_revision: confirmed.revision });
+    const imported = await store.importRequest({ actor_id: "usr-manager", expected_revision: published.revision, request_id: "request-call-1", source: "call", source_id: "call", raw_text: "synthetic", extraction: demoRequestExtraction("call") });
+    const requestConfirmed = await store.confirmRequest({ actor_id: "usr-manager", expected_revision: imported.revision, request_id: "request-call-1" });
+    const drafted = await store.draftPackage({ actor_id: "usr-manager", expected_revision: requestConfirmed.revision, request_id: "request-call-1" });
+    for (const body of [drafted.operations.packages[0]!.body.replace("200 py", "300 py"), drafted.operations.packages[0]!.body.replace(/^Attachment:.*$/m, ""), `${drafted.operations.packages[0]!.body}\nInvented support: 12 months`]) {
+      await expect(store.proposePackageEdit({ actor_id: "usr-manager", expected_revision: drafted.revision, package_id: "pkg-request-call-1", subject: drafted.operations.packages[0]!.subject, body, instruction: "malicious" })).rejects.toThrow(/protected|alter/);
+      expect(await store.getState()).toEqual(drafted);
+    }
+
+    const divergent = new DemoFileStore(store.storePath, async () => ({
+      access: { configuration_id: "access-v2", users: [{ user_id: "usr-manager", building_ids: ["bld-cobalt"] }] },
+      recipients: { id: "forged", building_id: "bld-cobalt", purpose: "broker_package", recipient_name: "Alex Chen", recipient_organization: "Northbridge Advisory", to: ["forged@example.test"], cc: [] },
+    }));
+    await expect(divergent.approvePackage({ actor_id: "usr-manager", expected_revision: drafted.revision, package_id: "pkg-request-call-1" })).rejects.toThrow(/diverged/);
+    expect(await store.getState()).toEqual(drafted);
+
+    const forged = structuredClone(drafted);
+    forged.operations.packages[0]!.body = forged.operations.packages[0]!.body.replace("200 py", "300 py");
+    await writeFile(statePath, JSON.stringify(forged), "utf8");
+    await expect(store.approvePackage({ actor_id: "usr-manager", expected_revision: forged.revision, package_id: "pkg-request-call-1" })).rejects.toThrow(/protected|altered/);
+    expect(await store.getState()).toEqual(forged);
+    forged.operations.packages[0]!.status = "approved";
+    forged.operations.packages[0]!.approved_by = "usr-manager";
+    forged.operations.packages[0]!.approved_at = "2026-07-18T12:00:00.000Z";
+    await writeFile(statePath, JSON.stringify(forged), "utf8");
+    await expect(store.sendPackage({ actor_id: "usr-manager", expected_revision: forged.revision, package_id: "pkg-request-call-1", idempotency_key: "forged-send-key" })).rejects.toThrow(/protected|altered/);
+    expect(await store.getState()).toEqual(forged);
+  });
+
+  it("rejects forged canonical facts and files at approval, send, and idempotent resend", async () => {
+    const { store, statePath } = await storeFixture();
+    const extracted = await store.extract({ actor_id: "usr-junior", expected_revision: 0 }, demoExtractionResult);
+    const confirmed = await store.confirm({ actor_id: "usr-junior", expected_revision: extracted.revision });
+    const published = await store.publish({ actor_id: "usr-senior", expected_revision: confirmed.revision });
+    const imported = await store.importRequest({ actor_id: "usr-manager", expected_revision: published.revision, request_id: "request-call-1", source: "call", source_id: "call", raw_text: "synthetic", extraction: demoRequestExtraction("call") });
+    const requestConfirmed = await store.confirmRequest({ actor_id: "usr-manager", expected_revision: imported.revision, request_id: "request-call-1" });
+    const drafted = await store.draftPackage({ actor_id: "usr-manager", expected_revision: requestConfirmed.revision, request_id: "request-call-1" });
+
+    const tamperCases: Array<(state: typeof drafted) => void> = [
+      (state) => { state.operations.packages[0]!.facts[0]!.value = 999; },
+      (state) => { state.operations.packages[0]!.facts[0]!.source_pointer = "Forged registry pointer"; },
+      (state) => { state.operations.packages[0]!.files[0]!.filename = "forged-current-plan.svg"; },
+    ];
+
+    for (const tamper of tamperCases) {
+      const forged = structuredClone(drafted);
+      tamper(forged);
+      const pkg = forged.operations.packages[0]!;
+      pkg.body = renderOperationalPackageBody(pkg.facts, pkg.files, "neutral");
+      await writeFile(statePath, JSON.stringify(forged), "utf8");
+      await expect(store.approvePackage({ actor_id: "usr-manager", expected_revision: forged.revision, package_id: pkg.id })).rejects.toThrow(/canonical published material/);
+      expect(await store.getState()).toEqual(forged);
+
+      pkg.status = "approved";
+      pkg.approved_by = "usr-manager";
+      pkg.approved_at = "2026-07-18T12:00:00.000Z";
+      await writeFile(statePath, JSON.stringify(forged), "utf8");
+      await expect(store.sendPackage({ actor_id: "usr-manager", expected_revision: forged.revision, package_id: pkg.id, idempotency_key: "forged-send-key" })).rejects.toThrow(/canonical published material/);
+      expect(await store.getState()).toEqual(forged);
+
+      pkg.status = "sent";
+      pkg.sent_at = "2026-07-18T12:01:00.000Z";
+      pkg.idempotency_key = "forged-send-key";
+      await writeFile(statePath, JSON.stringify(forged), "utf8");
+      await expect(store.sendPackage({ actor_id: "usr-manager", expected_revision: forged.revision, package_id: pkg.id, idempotency_key: "forged-send-key" })).rejects.toThrow(/canonical published material/);
+      expect(await store.getState()).toEqual(forged);
+    }
   });
 });

@@ -9,6 +9,9 @@ import { POST as reset } from "../app/api/demo/reset/route";
 import { GET as workflow } from "../app/api/demo/workflow/route";
 import { GET as mobileFile } from "../app/api/mobile/files/[filename]/route";
 import { GET as mobilePublished } from "../app/api/mobile/published/route";
+import { POST as extractRequest } from "../app/api/ai/extract-request/route";
+import { GET as mobileWorkflow, OPTIONS as mobileWorkflowOptions } from "../app/api/mobile/workflow/route";
+import { classifyWorkflowError } from "./workflow-error.server";
 
 const tempDirectories: string[] = [];
 
@@ -50,6 +53,50 @@ describe.sequential("synthetic demo route boundary", () => {
     expect(fileResponse.status).toBe(404);
     await expect(fileResponse.json()).resolves.toMatchObject({
       error: expect.stringContaining("DEMO_MODE=true"),
+    });
+
+    const workflowResponse = await mobileWorkflow();
+    expect(workflowResponse.status).toBe(404);
+    await expect(workflowResponse.json()).resolves.toMatchObject({ code: "DEMO_DISABLED" });
+  });
+
+  it("provides CORS preflight without exposing demo state", async () => {
+    const response = await mobileWorkflowOptions();
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-methods")).toContain("POST");
+  });
+
+  it("requires an explicit strict synthetic request source", async () => {
+    vi.stubEnv("DEMO_MODE", "true");
+    for (const body of [{}, { source: "sms" }, { source: "call", extra: true }]) {
+      const response = await extractRequest(new Request("http://localhost/api/ai/extract-request", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ code: "INVALID_REQUEST" });
+    }
+    for (const source of ["call", "email"] as const) {
+      const response = await extractRequest(new Request("http://localhost/api/ai/extract-request", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source }),
+      }));
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ mode: "credential_free_demo" });
+    }
+  });
+
+  it("fails closed for synthetic request extraction outside demo mode", async () => {
+    vi.stubEnv("DEMO_MODE", "false");
+    const response = await extractRequest(new Request("http://localhost/api/ai/extract-request", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "call" }),
+    }));
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "DEMO_DISABLED" });
+  });
+
+  it("maps cross-package idempotency reuse to a stable HTTP conflict", async () => {
+    expect(classifyWorkflowError(new Error("Idempotency key is already assigned to another package."))).toEqual({
+      status: 409,
+      body: { code: "IDEMPOTENCY_CONFLICT", error: "Idempotency key is already assigned to another package." },
     });
   });
 

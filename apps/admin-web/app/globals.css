@@ -35,7 +35,7 @@ select { border:1px solid var(--line); border-radius:10px; padding:9px 11px; bac
 .history-card h2 { margin-top:8px; }
 .history-card h3 { margin-top:22px; }
 .table-scroll { overflow-x:auto; }
-.mono { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; }
+.mono { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap; }
 .state-row { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
 .state-row h2 { margin-top:7px; text-transform:capitalize; }
 .step { opacity:.55; }

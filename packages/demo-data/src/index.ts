@@ -1,4 +1,5 @@
 import {
+  createInitialOperationalState,
   EXPECTED_PUBLICATION_FIELDS,
   requireExternalRecord,
   selectCurrentFloorPlan,
@@ -7,6 +8,8 @@ import {
   type ExpectedPublicationField,
   type FileVersion,
   type GovernedPublicationState,
+  type DraftMaterial,
+  type OperationalState,
   type UserRole,
   type VersionedRecord,
 } from "@leaseflow/domain";
@@ -57,8 +60,9 @@ export interface DemoFileVersion extends FileVersion {
 }
 
 export interface DemoState extends GovernedPublicationState<DemoRecord, DemoFileVersion> {
-  schema_version: 1;
+  schema_version: 2;
   source_id: "src-cobalt-jul";
+  operations: OperationalState;
 }
 
 const initialRecords: DemoRecord[] = [
@@ -77,7 +81,7 @@ const initialFiles: DemoFileVersion[] = [
 
 export function createInitialDemoState(): DemoState {
   return structuredClone({
-    schema_version: 1,
+    schema_version: 2,
     source_id: "src-cobalt-jul",
     revision: 0,
     effective_date: demoSourceUpdate.effectiveDate,
@@ -87,6 +91,7 @@ export function createInitialDemoState(): DemoState {
     records: initialRecords,
     files: initialFiles,
     audit: [],
+    operations: createInitialOperationalState(),
   } satisfies DemoState);
 }
 
@@ -228,7 +233,10 @@ export interface MobilePublishedSnapshot {
   floor_plan: {
     filename: string;
     download_url: string;
+    version_id: string;
+    source_pointer: string;
   };
+  fact_sources: Record<"marketed_area" | "rent_free" | "supported_parking", { version_id: string; source_pointer: string }>;
   blocked_floor_plans: string[];
 }
 
@@ -261,6 +269,13 @@ export function createMobilePublishedSnapshot(state: DemoState): MobilePublished
     floor_plan: {
       filename: plan.filename,
       download_url: `/api/mobile/files/${encodeURIComponent(plan.filename)}`,
+      version_id: plan.id,
+      source_pointer: "Published floor-plan registry",
+    },
+    fact_sources: {
+      marketed_area: { version_id: currentRecord(state, "marketed_area_py").id, source_pointer: "Published availability registry" },
+      rent_free: { version_id: currentRecord(state, "rent_free_months").id, source_pointer: "Published commercial-terms registry" },
+      supported_parking: { version_id: currentRecord(state, "supported_parking_spaces").id, source_pointer: "Published commercial-terms registry" },
     },
     blocked_floor_plans: state.files
       .filter((file) =>
@@ -270,6 +285,26 @@ export function createMobilePublishedSnapshot(state: DemoState): MobilePublished
         && (file.superseded || file.status === "superseded"))
       .map((file) => file.filename),
   };
+}
+
+export function createDemoDraftMaterial(state: DemoState): DraftMaterial {
+  const snapshot = createMobilePublishedSnapshot(state);
+  return {
+    building_id: snapshot.building_id,
+    building_name: snapshot.building_name,
+    floor: snapshot.floor,
+    facts: [
+      { field: "marketed_area", label: "Marketed area", value: snapshot.marketed_area_py, unit: "py", ...snapshot.fact_sources.marketed_area },
+      { field: "rent_free", label: "Rent-free", value: snapshot.rent_free_months, unit: "months", ...snapshot.fact_sources.rent_free },
+      { field: "supported_parking", label: "Supported parking", value: snapshot.supported_parking_spaces, unit: "spaces", ...snapshot.fact_sources.supported_parking },
+    ],
+    files: [{ requested_file: "current_floor_plan", filename: snapshot.floor_plan.filename, version_id: snapshot.floor_plan.version_id, source_pointer: snapshot.floor_plan.source_pointer }],
+  };
+}
+
+export function currentDemoMaterialVersionIds(state: DemoState): Set<string> {
+  const material = createDemoDraftMaterial(state);
+  return new Set([...material.facts.map((fact) => fact.version_id), ...material.files.map((file) => file.version_id)]);
 }
 
 export function requireCurrentPublishedDemoFile(state: DemoState, filename: string): DemoFileVersion {

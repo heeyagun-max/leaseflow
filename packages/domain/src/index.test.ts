@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   assertTransition,
+  approveOperationalPackage,
   canPerform,
   canSendExternal,
   confirmCandidates,
+  confirmOperationalRequest,
+  createInitialOperationalState,
+  decidePackageEdit,
+  draftOperationalPackage,
+  importOperationalRequest,
   publishConfirmedBatch,
+  proposePackageEdit,
   recordExtraction,
+  renderOperationalPackageBody,
   selectCurrentFloorPlan,
   selectCurrentPublished,
+  sendOperationalPackage,
   validateLandlordRecipients,
   type CandidateChange,
   type FileVersion,
@@ -44,6 +53,8 @@ describe("governed version selection", () => {
     expect(canPerform("data_steward", "candidate.confirm")).toBe(true);
     expect(canPerform("data_steward", "record.publish")).toBe(false);
     expect(canPerform("senior_reviewer", "record.publish")).toBe(true);
+    expect(canPerform("lm_manager", "package.send")).toBe(true);
+    expect(canPerform("lm_member", "package.send")).toBe(false);
   });
 
   it("requires landlord and LM recipient roles", () => {
@@ -61,6 +72,78 @@ describe("governed version selection", () => {
   it("blocks send until approval and clean records", () => {
     expect(canSendExternal({approved:true, unresolvedCount:0, facts:[versions[1]!], files:[versions[1]!]})).toBe(true);
     expect(canSendExternal({approved:false, unresolvedCount:0, facts:[versions[1]!], files:[versions[1]!]})).toBe(false);
+  });
+});
+
+describe("mobile request-to-package state machine", () => {
+  const manager = { id: "manager", role: "lm_manager" as const };
+  const extraction = {
+    language: "ko" as const,
+    building_mentions: [{ text: "Cobalt", resolved_building_id: "bld-cobalt", confidence: 0.99 }],
+    floor: "5F", requested_fields: ["marketed_area", "rent_free", "supported_parking"] as const,
+    requested_files: ["current_floor_plan"] as const,
+    recipient: { name: "Alex", organization: "Northbridge" }, deadline: "today afternoon", ambiguities: [],
+  };
+  const material = {
+    building_id: "bld-cobalt", building_name: "Cobalt Finance Center", floor: "5F",
+    facts: [
+      { field: "marketed_area" as const, label: "Marketed area", value: 200, unit: "py" as const, version_id: "area-v2", source_pointer: "published availability" },
+      { field: "rent_free" as const, label: "Rent-free", value: 2, unit: "months" as const, version_id: "rf-v2", source_pointer: "published terms" },
+      { field: "supported_parking" as const, label: "Supported parking", value: 2, unit: "spaces" as const, version_id: "park-v2", source_pointer: "published terms" },
+    ],
+    files: [{ requested_file: "current_floor_plan" as const, filename: "plan-v2.svg", version_id: "plan-v2", source_pointer: "published files" }],
+  };
+
+  function drafted() {
+    const imported = importOperationalRequest(createInitialOperationalState(), {
+      id: "req-1", source: "call", source_id: "call-1", raw_text: "request", extraction: { ...extraction, requested_fields: [...extraction.requested_fields], requested_files: [...extraction.requested_files] },
+    }, manager, "2026-07-18T01:00:00.000Z");
+    const confirmed = confirmOperationalRequest(imported, "req-1", manager, "2026-07-18T01:01:00.000Z");
+    return draftOperationalPackage(confirmed, "req-1", material, {
+      to: ["configured@example.test"], cc: ["manager@example.test"], configuration_id: "config-1",
+    }, manager, "2026-07-18T01:02:00.000Z");
+  }
+
+  it("blocks ambiguous confirmation and non-manager approval", () => {
+    const imported = importOperationalRequest(createInitialOperationalState(), {
+      id: "req-ambiguous", source: "email", source_id: "email-1", raw_text: "which building", extraction: {
+        ...extraction, requested_fields: [...extraction.requested_fields], requested_files: [...extraction.requested_files],
+        ambiguities: [{ field: "building", reason: "not resolved" }],
+      },
+    }, manager, "2026-07-18T01:00:00.000Z");
+    expect(() => confirmOperationalRequest(imported, "req-ambiguous", manager, "2026-07-18T01:01:00.000Z")).toThrow(/ambiguities/);
+    expect(() => approveOperationalPackage(drafted(), "pkg-req-1", { id: "member", role: "lm_member" }, "2026-07-18T01:03:00.000Z")).toThrow(/not allowed/);
+  });
+
+  it("protects package facts/files/recipients during subject-body edit", () => {
+    const before = drafted();
+    const pkg = before.packages[0]!;
+    const courteous = renderOperationalPackageBody(pkg.facts, pkg.files, "concise_courteous");
+    const proposed = proposePackageEdit(before, "pkg-req-1", { subject: pkg.subject, body: courteous, instruction: "make concise" }, manager, "2026-07-18T01:03:00.000Z");
+    const accepted = decidePackageEdit(proposed, "pkg-req-1", "accept", manager, "2026-07-18T01:04:00.000Z");
+    expect(accepted.packages[0]).toMatchObject({ subject: pkg.subject, body: courteous });
+    expect(accepted.packages[0]?.facts).toEqual(before.packages[0]?.facts);
+    expect(accepted.packages[0]?.files).toEqual(before.packages[0]?.files);
+    expect(accepted.packages[0]?.recipients).toEqual(before.packages[0]?.recipients);
+    for (const malicious of [courteous.replace("200 py", "300 py"), courteous.replace(/^Attachment:.*$/m, ""), `${courteous}\nInvented term: 12 months`]) {
+      expect(() => proposePackageEdit(before, "pkg-req-1", { subject: pkg.subject, body: malicious, instruction: "attack" }, manager, "2026-07-18T01:03:00.000Z")).toThrow(/protected|alter/);
+      expect(before.packages[0]).toEqual(pkg);
+    }
+  });
+
+  it("requires approval and current versions, then sends exactly once", () => {
+    const draft = drafted();
+    const current = new Set(["area-v2", "rf-v2", "park-v2", "plan-v2"]);
+    expect(() => sendOperationalPackage(draft, "pkg-req-1", "send-key-1", current, manager, "2026-07-18T01:04:00.000Z")).toThrow(/approval/);
+    const approved = approveOperationalPackage(draft, "pkg-req-1", manager, "2026-07-18T01:04:00.000Z");
+    expect(() => sendOperationalPackage(approved, "pkg-req-1", "send-key-1", new Set(["area-v1"]), manager, "2026-07-18T01:05:00.000Z")).toThrow(/stale/);
+    const sent = sendOperationalPackage(approved, "pkg-req-1", "send-key-1", current, manager, "2026-07-18T01:05:00.000Z");
+    expect(sent.activities).toHaveLength(1);
+    expect(sendOperationalPackage(sent, "pkg-req-1", "send-key-1", current, manager, "2026-07-18T01:06:00.000Z")).toBe(sent);
+
+    const second = { ...approved, packages: [...approved.packages, { ...approved.packages[0]!, id: "pkg-req-2", request_id: "req-2" }] };
+    const firstSent = sendOperationalPackage(second, "pkg-req-1", "global-key", current, manager, "2026-07-18T01:07:00.000Z");
+    expect(() => sendOperationalPackage(firstSent, "pkg-req-2", "global-key", current, manager, "2026-07-18T01:08:00.000Z")).toThrow(/another package/);
   });
 });
 
