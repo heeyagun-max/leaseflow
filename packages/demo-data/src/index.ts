@@ -1,17 +1,23 @@
 import {
   createInitialOperationalState,
+  createInitialWeeklyReportState,
   EXPECTED_PUBLICATION_FIELDS,
   requireExternalRecord,
   selectCurrentFloorPlan,
   selectCurrentPublished,
   type CandidateChange,
+  type ConfiguredReportRecipients,
+  type CreateWeeklyReportDraftInput,
   type ExpectedPublicationField,
   type FileVersion,
   type GovernedPublicationState,
   type DraftMaterial,
   type OperationalState,
+  type ReportSourceReference,
   type UserRole,
   type VersionedRecord,
+  type WeeklyReportSections,
+  type WeeklyReportState,
 } from "@leaseflow/domain";
 
 export const DEMO_AS_OF = new Date("2026-07-18T12:00:00.000Z");
@@ -59,10 +65,32 @@ export interface DemoFileVersion extends FileVersion {
   file_type: "floor_plan";
 }
 
+export interface DemoOperationalState extends OperationalState {
+  reports: WeeklyReportState;
+}
+
 export interface DemoState extends GovernedPublicationState<DemoRecord, DemoFileVersion> {
-  schema_version: 2;
+  schema_version: 3;
   source_id: "src-cobalt-jul";
+  operations: DemoOperationalState;
+}
+
+export type LegacyDemoStateV2 = Omit<DemoState, "schema_version" | "operations"> & {
+  schema_version: 2;
   operations: OperationalState;
+};
+
+export function migrateDemoStateToV3(state: DemoState | LegacyDemoStateV2): DemoState {
+  const cloned = structuredClone(state);
+  if (cloned.schema_version === 3) return cloned;
+  return {
+    ...cloned,
+    schema_version: 3,
+    operations: {
+      ...cloned.operations,
+      reports: createInitialWeeklyReportState(),
+    },
+  };
 }
 
 const initialRecords: DemoRecord[] = [
@@ -81,7 +109,7 @@ const initialFiles: DemoFileVersion[] = [
 
 export function createInitialDemoState(): DemoState {
   return structuredClone({
-    schema_version: 2,
+    schema_version: 3,
     source_id: "src-cobalt-jul",
     revision: 0,
     effective_date: demoSourceUpdate.effectiveDate,
@@ -91,7 +119,10 @@ export function createInitialDemoState(): DemoState {
     records: initialRecords,
     files: initialFiles,
     audit: [],
-    operations: createInitialOperationalState(),
+    operations: {
+      ...createInitialOperationalState(),
+      reports: createInitialWeeklyReportState(),
+    },
   } satisfies DemoState);
 }
 
@@ -331,3 +362,179 @@ export const assistantHome = {
   weeklyReportsDue: 1,
   heroBuilding: "Cobalt Finance Center",
 } as const;
+
+export type DemoOutlookShareScope = "external_reportable" | "client_confidential";
+
+export interface DemoMockOutlookMessage {
+  id: string;
+  building_id: string;
+  thread_id: string;
+  occurred_at: string;
+  direction: "inbound" | "outbound";
+  subject: string;
+  body: string;
+  share_scope: DemoOutlookShareScope;
+}
+
+export const demoMockOutlookMessages = [
+  {
+    id: "mail-001",
+    building_id: "bld-cobalt",
+    thread_id: "thread-cobalt",
+    occurred_at: "2026-07-16T09:30:00+09:00",
+    direction: "inbound",
+    subject: "Cobalt Finance Center 5F area update",
+    body: "100 py has been occupied. Please use the revised 200 py marketing plan after approval.",
+    share_scope: "external_reportable",
+  },
+  {
+    id: "mail-002",
+    building_id: "bld-cobalt",
+    thread_id: "thread-cobalt",
+    occurred_at: "2026-07-17T13:15:00+09:00",
+    direction: "inbound",
+    subject: "Revised incentives and parking support",
+    body: "Rent-free is revised to two months and supported parking is two spaces. Senior approval is pending.",
+    share_scope: "client_confidential",
+  },
+  {
+    id: "mail-003",
+    building_id: "bld-cobalt",
+    thread_id: "thread-cobalt",
+    occurred_at: "2026-07-18T11:05:00+09:00",
+    direction: "outbound",
+    subject: "Cobalt Finance Center 5F materials",
+    body: "Approved package prepared and sent through LeaseFlow sandbox.",
+    share_scope: "external_reportable",
+  },
+] as const satisfies readonly DemoMockOutlookMessage[];
+
+function isExternalReportableDemoOutlookMessage(
+  value: unknown,
+  buildingId: string,
+): value is DemoMockOutlookMessage & { share_scope: "external_reportable" } {
+  if (typeof value !== "object" || value === null) return false;
+  const message = value as Record<string, unknown>;
+  return message.building_id === buildingId
+    && message.share_scope === "external_reportable"
+    && typeof message.id === "string"
+    && message.id.length > 0
+    && typeof message.occurred_at === "string"
+    && message.occurred_at.length > 0
+    && typeof message.body === "string"
+    && message.body.length > 0;
+}
+
+export function selectExternalReportableMockOutlook(
+  messages: readonly unknown[],
+  buildingId: string,
+): ReportSourceReference[] {
+  return messages
+    .filter((message): message is DemoMockOutlookMessage & { share_scope: "external_reportable" } =>
+      isExternalReportableDemoOutlookMessage(message, buildingId))
+    .map((message) => ({
+      id: message.id,
+      source_type: "mock_outlook",
+      building_id: message.building_id,
+      occurred_at: message.occurred_at,
+      share_scope: "external_reportable",
+      summary: message.body,
+    }));
+}
+
+export const demoWeeklyReportRecipientGroup = {
+  configuration_id: "recipient-group-cobalt-weekly-v1",
+  building_id: "bld-cobalt",
+  to: [{ email: "am.manager@example.test", role: "to_landlord_practical" }],
+  cc: [
+    { email: "am.team@example.test", role: "cc_landlord_team" },
+    { email: "am.exec@example.test", role: "cc_landlord_exec" },
+    { email: "lm.team@example.test", role: "cc_lm_team" },
+    { email: "lm.exec@example.test", role: "cc_lm_exec" },
+  ],
+} as const;
+
+export const demoWeeklyReportSections = {
+  key_issue: "5F marketed area and floor plan revised after partial occupancy.",
+  changes_since_last_report: [
+    "Marketed area 300 py → 200 py",
+    "Floor plan v1 → v2",
+    "Rent-free 3 months → 2 months",
+    "Supported parking 3 → 2",
+  ],
+  activity_summary: [
+    "Broker requested current 5F package",
+    "Revised package prepared after publication",
+  ],
+  negotiated_area_floor_changes: [
+    "Marketed area 300 py → 200 py",
+    "Floor plan v1 → v2",
+  ],
+  competitor_buildings: [],
+  blocker_and_pending_approval: ["None after senior publication"],
+  next_actions: [{
+    action: "Confirm broker feedback on Monday",
+    owner: "LM Manager",
+    due_date: "2026-07-20",
+  }],
+} as const satisfies WeeklyReportSections;
+
+export const demoWeeklyReportExpected = {
+  id: "report-cobalt-2026-w29",
+  building_id: "bld-cobalt",
+  reporting_period: { from: "2026-07-13", to: "2026-07-18" },
+  sections: demoWeeklyReportSections,
+} as const;
+
+const demoLeaseFlowReportSource: ReportSourceReference = {
+  id: "activity-call-cobalt",
+  source_type: "leaseflow_activity",
+  building_id: "bld-cobalt",
+  occurred_at: "2026-07-18T11:06:00+09:00",
+  share_scope: "external_reportable",
+  summary: "Broker requested current 5F package",
+};
+
+export function createDemoWeeklyReportDraftInput(): CreateWeeklyReportDraftInput {
+  const recipients: ConfiguredReportRecipients = {
+    configuration_id: demoWeeklyReportRecipientGroup.configuration_id,
+    to: demoWeeklyReportRecipientGroup.to.map(({ email, role }) => ({ email, role })),
+    cc: demoWeeklyReportRecipientGroup.cc.map(({ email, role }) => ({ email, role })),
+  };
+  return structuredClone({
+    id: demoWeeklyReportExpected.id,
+    building_id: demoWeeklyReportExpected.building_id,
+    reporting_period: demoWeeklyReportExpected.reporting_period,
+    sections: demoWeeklyReportExpected.sections,
+    sources: [
+      demoLeaseFlowReportSource,
+      ...selectExternalReportableMockOutlook(demoMockOutlookMessages, "bld-cobalt"),
+    ],
+    attachments: [{
+      id: "attachment-cobalt-plan-v2",
+      building_id: "bld-cobalt",
+      version_id: "file-cobalt-plan-v2",
+      filename: "CFC_5F_plan_v2.svg",
+    }],
+    material_version_ids: [
+      "av-cobalt-5f-v2",
+      "term-cobalt-rf-v2",
+      "term-cobalt-park-v2",
+    ],
+    recipients,
+    cover: {
+      subject: "[Weekly Report] Cobalt Finance Center 2026-07-13–2026-07-18",
+      body: "Please find the approved building-specific weekly report attached.",
+    },
+  } satisfies CreateWeeklyReportDraftInput);
+}
+
+export function currentDemoWeeklyReportMaterialIds(
+  input: CreateWeeklyReportDraftInput = createDemoWeeklyReportDraftInput(),
+): Set<string> {
+  return new Set([
+    ...input.material_version_ids,
+    ...input.attachments.map((attachment) => attachment.version_id),
+    ...input.sources.map((source) => source.id),
+  ]);
+}

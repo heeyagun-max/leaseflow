@@ -1,4 +1,5 @@
 {
+  "id": "report-cobalt-2026-w29",
   "building_id": "bld-cobalt",
   "reporting_period": {
     "from": "2026-07-13",
@@ -16,8 +17,20 @@
       "Broker requested current 5F package",
       "Revised package prepared after publication"
     ],
-    "blocker": "None after senior publication",
-    "next_action": "Confirm broker feedback on Monday",
-    "competitor_buildings": []
+    "negotiated_area_floor_changes": [
+      "Marketed area 300 py → 200 py",
+      "Floor plan v1 → v2"
+    ],
+    "competitor_buildings": [],
+    "blocker_and_pending_approval": [
+      "None after senior publication"
+    ],
+    "next_actions": [
+      {
+        "action": "Confirm broker feedback on Monday",
+        "owner": "LM Manager",
+        "due_date": "2026-07-20"
+      }
+    ]
   }
 }

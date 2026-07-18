@@ -1,30 +1,26 @@
 {
+  "configuration_id": "recipient-group-cobalt-weekly-v1",
   "building_id": "bld-cobalt",
   "to": [
     {
-      "name": "Landlord AM Manager",
       "email": "am.manager@example.test",
       "role": "to_landlord_practical"
     }
   ],
   "cc": [
     {
-      "name": "Landlord AM Team",
       "email": "am.team@example.test",
       "role": "cc_landlord_team"
     },
     {
-      "name": "Landlord Executive",
       "email": "am.exec@example.test",
       "role": "cc_landlord_exec"
     },
     {
-      "name": "LM Team",
       "email": "lm.team@example.test",
       "role": "cc_lm_team"
     },
     {
-      "name": "LM Executive",
       "email": "lm.exec@example.test",
       "role": "cc_lm_exec"
     }
