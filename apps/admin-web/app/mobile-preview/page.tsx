@@ -47,7 +47,7 @@ export default function MobilePreview() {
   const request = workflow?.requests.at(-1);
   const pkg = workflow?.packages.at(-1);
 
-  return <main>
+  return <main className="lf-legacy-page">
     <header><div className="brand">LeaseFlow Mobile Operations Preview</div><span className="pill">DEMO · LM Manager · SANDBOX ONLY</span></header>
     {error && <div className="notice error">{error}</div>}
     <div className="grid">

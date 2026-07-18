@@ -63,12 +63,12 @@ export default function Page() {
     }
   }
 
-  if (!workflow) return <main><div className="card">Loading governed demo state…</div></main>;
+  if (!workflow) return <main className="lf-legacy-page"><div className="card">Loading governed demo state…</div></main>;
   const { state, source, users } = workflow;
   const actor = users.find((user) => user.id === actorId) ?? users[0]!;
 
   return (
-    <main>
+    <main className="lf-legacy-page">
       <header>
         <div><div className="brand">LeaseFlow Data Admin</div><div className="muted">Synthetic demo · revision {state.revision}</div></div>
         <label className="role-picker">Demo scenario actor · not authentication
