@@ -10,6 +10,7 @@ exports/
 data/demo/.runtime/
 *.tsbuildinfo
 *.pdf
+*.docx
 *.dwg
 *.xlsx
 *.pptx

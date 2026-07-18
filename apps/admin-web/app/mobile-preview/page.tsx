@@ -66,18 +66,48 @@ export default function MobilePreview() {
   const [snapshot, setSnapshot] = useState<MobilePublishedSnapshot | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function reload() {
+  async function reload(): Promise<boolean> {
     try {
       const [publishedResponse, workflowResponse] = await Promise.all([
         fetch("/api/mobile/published", { cache: "no-store" }), fetch("/api/mobile/workflow", { cache: "no-store" }),
       ]);
-      if (!publishedResponse.ok || !workflowResponse.ok) throw new Error("자산 정보를 먼저 게시한 뒤 다시 시도해 주세요.");
-      setSnapshot(await publishedResponse.json() as MobilePublishedSnapshot);
+      if (!workflowResponse.ok) throw new Error("현장 업무를 불러오지 못했습니다.");
       setWorkflow(await workflowResponse.json() as WorkflowView);
-      setError(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "현장 업무를 불러오지 못했습니다."); }
+      if (publishedResponse.ok) {
+        setSnapshot(await publishedResponse.json() as MobilePublishedSnapshot);
+        setError(null);
+      } else {
+        setSnapshot(null);
+        setError("자산 정보를 먼저 게시하면 최신 임대 정보가 표시됩니다.");
+      }
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "현장 업무를 불러오지 못했습니다.");
+      return false;
+    }
+  }
+
+  async function resetDemo() {
+    if (!workflow || !window.confirm("현재까지 만든 요청과 안내 자료 진행 기록이 모두 사라지고 처음 상태로 돌아갑니다. 계속할까요?")) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const response = await fetch("/api/demo/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ actor_id: "usr-manager", expected_revision: workflow.revision }),
+      });
+      const body = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(friendlyWorkflowError(body.error));
+      if (await reload()) setFeedback("데모를 처음 상태로 되돌렸습니다. 게시 정보와 안내 자료 상태를 다시 확인했습니다.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "데모를 처음 상태로 되돌리지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function act(action: Record<string, unknown>) {
@@ -100,8 +130,12 @@ export default function MobilePreview() {
   const pkg = workflow?.packages.at(-1);
 
   return <main className="lf-legacy-page">
-    <header><div><div className="brand">LeaseFlow</div><span className="muted">현장 화면 미리보기</span></div><span className="pill">데모</span></header>
+    <header>
+      <div><div className="brand">LeaseFlow</div><span className="muted">현장 화면 미리보기</span></div>
+      <div className="demo-context" aria-label="데모 실행 정보"><span className="pill">데모</span><span className="pill">임대 관리 책임자</span><span className="pill">모의 발송 전용</span></div>
+    </header>
     {error && <div className="notice error">{error}</div>}
+    {feedback && <div className="notice success" role="status">{feedback}</div>}
     <div className="grid">
       <section className="card">
         <div className="kicker">현재 임대 정보</div><h1>Cobalt Finance Center · 5층</h1>
@@ -122,8 +156,8 @@ export default function MobilePreview() {
         )}
       </section>
     </div>
-    <p className="lf-demo-boundary">데모 데이터만 사용하며 실제 이메일·전화·로그인 연동은 없습니다.</p>
-    <div className="actions"><button type="button" className="ghost" onClick={() => void reload()}>새로고침</button><Link className="button secondary" href="/">관리자 화면으로</Link></div>
+    <p className="lf-demo-boundary">합성 데모 데이터 · 실제 이메일, 전화, 로그인 연결 없음</p>
+    <div className="actions"><button type="button" className="ghost" disabled={busy || !workflow} aria-label="모든 데모 진행 기록을 지우고 처음 상태로 되돌리기" onClick={() => void resetDemo()}>처음 상태로 되돌리기</button><button type="button" className="ghost" disabled={busy} onClick={() => void reload()}>새로고침</button><Link className="button secondary" href="/">관리자 화면으로</Link></div>
   </main>;
 }
 
@@ -141,9 +175,9 @@ function PackagePanel({ pkg, busy, act }: { pkg: PublicPackage; busy: boolean; a
     <div className="actions">
       {pkg.status === "draft" && <><button type="button" className="secondary" disabled={busy} onClick={() => void act({ action: "edit", package_id: pkg.id, instruction: "Make concise and courteous" })}>문장 다듬기</button><button type="button" className="primary" disabled={busy} onClick={() => void act({ action: "approve", package_id: pkg.id })}>안내 자료 승인</button></>}
       {pkg.status === "edit_pending" && <><button type="button" className="primary" disabled={busy} onClick={() => void act({ action: "decide", package_id: pkg.id, decision: "accept" })}>제안 문안 사용</button><button type="button" className="ghost" disabled={busy} onClick={() => void act({ action: "decide", package_id: pkg.id, decision: "reject" })}>기존 문안 유지</button></>}
-      {pkg.status === "approved" && <button type="button" className="primary" disabled={busy} onClick={() => void act({ action: "send", package_id: pkg.id, idempotency_key: `judge-sandbox-${pkg.id}` })}>데모 전달하기</button>}
+      {pkg.status === "approved" && <button type="button" className="primary" disabled={busy} onClick={() => void act({ action: "send", package_id: pkg.id, idempotency_key: `judge-sandbox-${pkg.id}` })}>확인하고 발송 기록 남기기</button>}
     </div>
-    {pkg.status === "sent" && <div className="notice success">데모 전달을 기록했습니다.</div>}
+    {pkg.status === "sent" && <div className="notice success">발송 기록을 남겼습니다.</div>}
   </div>;
 }
 

@@ -1,5 +1,7 @@
 # Package Manifest
 
+The canonical version, exact file names, target package tree, archive policy, and artifact-availability status are defined in `CURRENT_VERSION_AND_MANIFEST.md`.
+
 - Product direction and MVP scope
 - Next.js admin scaffold
 - Expo mobile scaffold

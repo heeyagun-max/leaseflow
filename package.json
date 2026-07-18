@@ -10,8 +10,11 @@
     "dev:admin": "npm run dev -w @leaseflow/admin-web",
     "dev:mobile": "npm run start -w @leaseflow/mobile",
     "web:mobile": "npm run web -w @leaseflow/mobile",
+    "demo:admin": "DEMO_MODE=true SANDBOX_EMAIL_MODE=true LEASEFLOW_DEMO_STATE_PATH=../../data/demo/.runtime/state.v1.json npm run dev -w @leaseflow/admin-web -- --hostname 0.0.0.0 --port 3000",
+    "demo:mobile": "EXPO_PUBLIC_LEASEFLOW_API_URL=http://localhost:3000 npm run web -w @leaseflow/mobile -- --port 8081",
+    "demo:reset": "node scripts/reset-demo.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "node --test scripts/reset-demo.test.mjs && npm run test --workspaces --if-present",
     "validate": "node scripts/validate-pack.mjs"
   },
   "devDependencies": {

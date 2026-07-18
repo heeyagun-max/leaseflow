@@ -8,6 +8,7 @@ import {
   assertGovernedPublicationStateInvariants,
   assertWeeklyReportIntegrity,
   confirmCandidates,
+  confirmSourceAsset,
   confirmOperationalRequest,
   createInitialWeeklyReportState,
   createWeeklyReportDraft,
@@ -19,6 +20,7 @@ import {
   proposePackageEdit,
   proposeWeeklyReportPatch,
   publishConfirmedBatch,
+  publishSourceAsset,
   recordExtraction,
   sendWeeklyReport,
   sendOperationalPackage,
@@ -312,6 +314,28 @@ const operationalStateSchema = z.object({
   }).strict()),
   reports: weeklyReportStateSchema,
 }).strict();
+const assetAuditProvenanceSchema = z.object({
+  event: z.enum(["registered", "filename_observed", "classified", "steward_confirmed", "published", "superseded"]),
+  actor_id: z.string().min(1), occurred_at: z.string().datetime(), details: z.record(z.unknown()),
+}).strict();
+const sourceAssetSchema = z.object({
+  id: z.string().min(1), observed_filenames: z.array(z.string().min(1)).min(1),
+  synthetic_fingerprint: z.string().startsWith("synthetic:"), mime_type: z.string().min(1), extension: z.string(),
+  byte_size: z.number().int().nonnegative(), building_id: z.string().min(1).nullable(),
+  building_alias_candidate: z.string().min(1).nullable(), source_organization: z.string().min(1),
+  document_category: z.enum(["perspective_render", "building_flyer", "portfolio_flyer", "floor_plan", "area_workbook", "legal_document"]),
+  artifact_date: dateSchema.nullable(), effective_date: dateSchema.nullable(),
+  confidentiality: z.enum(["internal", "restricted", "legal_restricted", "public_candidate"]),
+  externally_shareable: z.boolean(), status: z.enum(["registered", "steward_confirmed", "published", "superseded", "duplicate", "rejected"]),
+  classification_state: z.enum(["candidate", "confirmed", "manual_review"]), version_family: z.string().min(1),
+  segmentation_marker: z.string().min(1).nullable(), linked_file_version_id: z.string().min(1).nullable(),
+  duplicate_of: z.string().min(1).nullable(), supersedes: z.string().min(1).nullable(),
+  extraction_method: z.enum(["deterministic_metadata", "text_candidate", "manual"]),
+  extraction_state: z.enum(["not_started", "candidate_ready", "unsupported", "reviewed"]),
+  review_decision: z.enum(["pending", "confirmed", "rejected"]), reviewed_by: z.string().min(1).nullable(),
+  reviewed_at: z.string().datetime().nullable(), active: z.boolean(), authorized: z.boolean(),
+  audit_provenance: z.array(assetAuditProvenanceSchema).min(1),
+}).strict();
 const persistedDemoStateSchema = z.object({
   schema_version: z.literal(3),
   source_id: z.literal("src-cobalt-jul"),
@@ -326,6 +350,7 @@ const persistedDemoStateSchema = z.object({
   records: z.array(recordSchema),
   files: z.array(fileSchema),
   audit: z.array(auditSchema),
+  asset_registry: z.object({ assets: z.array(sourceAssetSchema) }).strict(),
   operations: operationalStateSchema,
 }).strict();
 
@@ -363,6 +388,19 @@ function assertOperationalStateInvariants(state: DemoRuntimeState): void {
   }
 }
 
+function assertAssetRegistryInvariants(state: DemoRuntimeState): void {
+  const ids = state.asset_registry.assets.map((asset) => asset.id);
+  const fingerprints = state.asset_registry.assets.map((asset) => asset.synthetic_fingerprint);
+  if (new Set(ids).size !== ids.length) throw new Error("duplicate governed source asset id");
+  if (new Set(fingerprints).size !== fingerprints.length) throw new Error("exact fingerprint must resolve to one governed source asset");
+  const fileIds = new Set(state.files.map((file) => file.id));
+  for (const asset of state.asset_registry.assets) {
+    if (asset.linked_file_version_id && !fileIds.has(asset.linked_file_version_id)) {
+      throw new Error(`source asset ${asset.id} references a missing linked file version`);
+    }
+  }
+}
+
 function migratePersistedState(value: unknown): unknown {
   const candidate = value as { schema_version?: unknown; operations?: unknown };
   if (candidate?.schema_version === 1) {
@@ -373,6 +411,9 @@ function migratePersistedState(value: unknown): unknown {
     };
   }
   if (candidate?.schema_version === 2) {
+    return migrateDemoStateToV3(value as LegacyDemoStateV2);
+  }
+  if (candidate?.schema_version === 3 && !("asset_registry" in (value as Record<string, unknown>))) {
     return migrateDemoStateToV3(value as LegacyDemoStateV2);
   }
   return value;
@@ -387,6 +428,7 @@ function parsePersistedState(value: unknown): DemoRuntimeState {
     const state = persistedDemoStateSchema.parse(migratePersistedState(value)) as DemoRuntimeState;
     assertGovernedPublicationStateInvariants(state);
     assertOperationalStateInvariants(state);
+    assertAssetRegistryInvariants(state);
     return state;
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid state";
@@ -487,6 +529,40 @@ export class DemoFileStore {
       this.resolveActor(input.actor_id),
       input.occurred_at ?? new Date().toISOString(),
     ));
+  }
+
+  async confirmAsset(input: {
+    actor_id: string; expected_revision: number; asset_id: string; building_id: string;
+    externally_shareable: boolean; occurred_at?: string;
+  }): Promise<DemoState> {
+    return this.mutate(input.expected_revision, (state) => ({
+      ...state,
+      revision: state.revision + 1,
+      asset_registry: confirmSourceAsset(state.asset_registry, {
+        asset_id: input.asset_id,
+        building_id: input.building_id,
+        externally_shareable: input.externally_shareable,
+        actor: this.resolveActor(input.actor_id),
+        occurred_at: input.occurred_at ?? new Date().toISOString(),
+      }),
+    }));
+  }
+
+  async publishAsset(input: {
+    actor_id: string; expected_revision: number; asset_id: string; occurred_at?: string;
+  }): Promise<DemoState> {
+    return this.mutate(input.expected_revision, (state) => ({
+      ...state,
+      revision: state.revision + 1,
+      asset_registry: publishSourceAsset(state.asset_registry, {
+        asset_id: input.asset_id,
+        actor: this.resolveActor(input.actor_id),
+        occurred_at: input.occurred_at ?? new Date().toISOString(),
+        current_linked_file_versions: new Map(state.files
+          .filter((file) => file.status === "published" && !file.superseded && file.external_shareable)
+          .map((file) => [file.id, file.building_id])),
+      }),
+    }));
   }
 
   async importRequest(input: {
@@ -915,7 +991,8 @@ export class DemoFileStore {
   private assertOfficialProjectionUnchanged(before: DemoRuntimeState, after: DemoRuntimeState): void {
     const project = (state: DemoRuntimeState) => ({
       source_id: state.source_id, effective_date: state.effective_date, publication_scope: state.publication_scope,
-      stage: state.stage, candidates: state.candidates, records: state.records, files: state.files, audit: state.audit,
+      stage: state.stage, candidates: state.candidates, records: state.records, files: state.files,
+      asset_registry: state.asset_registry, audit: state.audit,
     });
     if (JSON.stringify(project(before)) !== JSON.stringify(project(after))) {
       throw new Error("Operational workflow attempted to mutate official publication data.");
@@ -931,7 +1008,9 @@ export class DemoFileStore {
       const raw = await readFile(this.storePath, "utf8");
       const parsed: unknown = JSON.parse(raw);
       const shouldPersistMigration = (parsed as { schema_version?: unknown }).schema_version === 1
-        || (parsed as { schema_version?: unknown }).schema_version === 2;
+        || (parsed as { schema_version?: unknown }).schema_version === 2
+        || ((parsed as { schema_version?: unknown }).schema_version === 3
+          && !("asset_registry" in (parsed as Record<string, unknown>)));
       const state = parsePersistedState(parsed);
       if (shouldPersistMigration) await this.writeValidatedState(state);
       return state;

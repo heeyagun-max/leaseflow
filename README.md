@@ -72,16 +72,47 @@ The deployed demo must make real server-side GPT-5.6 calls for:
 
 Set the exact GPT-5.6 API model identifier available to your project in `OPENAI_MODEL`. Do not guess or hardcode an unavailable model ID. A deterministic mock mode is provided only for local development and test stability.
 
-## Quick start after Codex scaffolds dependencies
+## Credential-free local demo
+
+Prerequisites: Node.js 20+ and npm. The checked-in demo uses synthetic data and does not require an OpenAI key, Outlook, SSO, email, carrier, Supabase, or company-system credentials.
+
+Install and validate once:
 
 ```bash
-npm install
-cp .env.example .env.local
+npm ci
 npm run validate
 npm run test
-npm run dev:admin
-npm run dev:mobile
 ```
+
+Do not copy the root `.env.example` to `.env.local` for judging. The demo commands below set the authoritative local values explicitly.
+
+Terminal 1 — Admin Web and demo API:
+
+```bash
+npm run demo:admin
+```
+
+Open <http://localhost:3000>.
+
+Terminal 2 — Expo Web, after Terminal 1 is ready:
+
+```bash
+npm run demo:mobile
+```
+
+Open <http://localhost:8081>. `demo:mobile` explicitly embeds `EXPO_PUBLIC_LEASEFLOW_API_URL=http://localhost:3000` so the browser uses the Admin API.
+
+Reset the synthetic workflow at any time while Admin Web is running:
+
+```bash
+npm run demo:reset
+```
+
+The reset command first reads the current workflow revision, then posts the revision-aware reset. See [Judge Test Instructions](docs/JUDGE_TEST_INSTRUCTIONS.md) and [Local Demo and Deployment](docs/LOCAL_DEMO_AND_DEPLOYMENT.md).
+
+## Deployment status
+
+Portable two-surface container configuration is provided in `compose.demo.yaml` and `deploy/`. Public Admin and Mobile URLs are pending deployment; none are claimed in this repository.
 
 ## Submission evidence
 

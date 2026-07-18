@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
@@ -22,6 +25,7 @@ import {
   type StatusTone,
 } from "../src/components/operations-ui";
 import { fetchPublishedData } from "../src/data/published-data";
+import { resetDemo } from "../src/data/demo-reset";
 import {
   ReportWorkflowHttpError,
   REPORT_INVESTIGATION_COMMANDS,
@@ -46,6 +50,7 @@ import {
   lineHeight,
   radius,
   space,
+  surfaceDepth,
   tabularNumbers,
   tracking,
   type,
@@ -70,6 +75,13 @@ const EMPTY_ERRORS: SurfaceErrors = {
   package: null,
   report: null,
 };
+
+const BOTTOM_NAV_TABS = [
+  { key: "home", label: "홈", glyph: "⌂" },
+  { key: "work", label: "담당 업무", glyph: "▣" },
+  { key: "records", label: "업무 기록", glyph: "◴" },
+  { key: "reports", label: "주간 보고", glyph: "□" },
+] as const;
 
 const investigationCommandLabels: Record<string, string> = {
   "통화내용 확인해서 이번주 변동사항 업데이트 해": "이번 주 통화 변동 확인",
@@ -142,20 +154,39 @@ function friendlyUnresolvedItem(field: string, question: string) {
   return `${friendlyFactLabel(field)} 정보를 추가로 확인해 주세요.`;
 }
 
+async function confirmDemoReset(): Promise<boolean> {
+  const message = "현재까지 만든 요청, 안내 자료, 보고서 진행 기록이 모두 사라지고 처음 상태로 돌아갑니다.";
+  if (Platform.OS === "web") return globalThis.confirm(message);
+  return new Promise((resolve) => {
+    Alert.alert("데모를 처음 상태로 되돌릴까요?", message, [
+      { text: "취소", style: "cancel", onPress: () => resolve(false) },
+      { text: "처음 상태로 되돌리기", style: "destructive", onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) });
+  });
+}
+
 export default function Home() {
   const { width } = useWindowDimensions();
-  const isWide = width >= layout.wideBreakpoint;
-  const isTablet = width >= layout.tabletBreakpoint;
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const isWide = hasHydrated && width >= layout.wideBreakpoint;
+  const isTablet = hasHydrated && width >= layout.tabletBreakpoint;
   const [published, setPublished] = useState<MobilePublishedSnapshot | null>(null);
   const [workflow, setWorkflow] = useState<MobileWorkflowView | null>(null);
   const [reportWorkflow, setReportWorkflow] = useState<MobileReportWorkflowView | null>(null);
   const [errors, setErrors] = useState<SurfaceErrors>(EMPTY_ERRORS);
   const [notice, setNotice] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<SurfaceError | null>(null);
   const [busyKey, setBusyKey] = useState<BusyKey>("initial-load");
   const [selectedLane, setSelectedLane] = useState<"request" | "report" | null>(null);
+  const [activeTab, setActiveTab] = useState<"home" | "work" | "records" | "reports">("home");
+  const [commandText] = useState<string>(demoRequest.text);
 
   const updateError = useCallback((surface: keyof SurfaceErrors, next: SurfaceError | null) => {
     setErrors((current) => ({ ...current, [surface]: next }));
+  }, []);
+
+  useEffect(() => {
+    setHasHydrated(true);
   }, []);
 
   const refreshPublished = useCallback(async () => {
@@ -239,6 +270,27 @@ export default function Home() {
     }
   }, [busyKey, refreshPackageWorkflow, refreshReportWorkflow, reportWorkflow, updateError]);
 
+  const runDemoReset = useCallback(async () => {
+    if (!workflow || busyKey || !(await confirmDemoReset())) return;
+    setBusyKey("demo-reset");
+    setNotice(null);
+    setResetError(null);
+    try {
+      await resetDemo(workflow.revision);
+      setSelectedLane(null);
+      setActiveTab("home");
+      setErrors(EMPTY_ERRORS);
+      await refreshAll(false);
+      setNotice("데모를 처음 상태로 되돌렸습니다. 임대 정보, 안내 자료, 주간 보고서 상태를 다시 확인했습니다.");
+    } catch (error) {
+      setNotice(null);
+      setResetError(surfaceError("데모를 처음 상태로 되돌리지 못했습니다", error));
+      if (isRevisionConflict(error)) await refreshAll(false);
+    } finally {
+      setBusyKey(null);
+    }
+  }, [busyKey, refreshAll, workflow]);
+
   const request = workflow?.requests.at(-1);
   const packageDraft = workflow?.packages.at(-1);
   const report = reportWorkflow?.reports.at(-1);
@@ -247,7 +299,7 @@ export default function Home() {
   const activeLane = selectedLane ?? recommendedLane(request, packageDraft, report);
 
   return (
-    <>
+    <View style={styles.appFrame}>
       <Head>
         <title>LeaseFlow 현장 업무</title>
         <meta name="description" content="LeaseFlow 현장 임대 업무" />
@@ -262,42 +314,79 @@ export default function Home() {
 
       <View style={styles.topbar}>
         <View style={styles.brandCluster}>
-          <View style={styles.brandMark} accessibilityElementsHidden>
-            <View style={styles.brandMarkInner} />
-          </View>
           <View>
             <Text style={styles.brand}>LeaseFlow</Text>
-            <Text style={styles.brandSubline}>현장 업무</Text>
           </View>
         </View>
-        <View style={[styles.topbarMeta, isTablet && styles.topbarMetaTablet]}>
-          <StatusBadge label="데모" tone="neutral" />
-        </View>
+        <View style={styles.profileMark} accessibilityLabel="김 매니저"><Text style={styles.profileMarkText}>김</Text></View>
       </View>
 
-      <View style={styles.pageHeading}>
-        <View style={styles.pageHeadingCopy}>
-          <Text accessibilityRole="header" aria-level={1} style={styles.pageTitle}>오늘 할 일</Text>
-          <Text style={styles.pageContext}>Cobalt Finance Center · 5층</Text>
+      <View style={styles.demoContext} accessibilityLabel="데모 실행 정보">
+        <View style={styles.demoLabels}>
+          <StatusBadge label="데모" tone="neutral" />
+          <StatusBadge label="임대 관리 책임자" tone="info" />
+          <StatusBadge label="모의 발송 전용" tone="warning" />
         </View>
-        <View style={styles.pageHeadingAction}>
+        <View style={!isTablet ? styles.demoResetMobile : undefined}>
           <ActionButton
-            label="새로고침"
+            label="처음 상태로 되돌리기"
             variant="ghost"
             compact
-            loading={busyKey === "refresh-all" || busyKey === "initial-load"}
-            disabled={Boolean(busyKey) && busyKey !== "refresh-all" && busyKey !== "initial-load"}
-            onPress={() => void refreshAll()}
-            hint="임대 정보, 요청, 주간 보고서를 다시 불러옵니다"
+            loading={busyKey === "demo-reset"}
+            disabled={!workflow || (Boolean(busyKey) && busyKey !== "demo-reset")}
+            onPress={() => void runDemoReset()}
+            hint="확인 후 모든 데모 진행 기록을 지우고 처음 상태로 되돌립니다"
           />
+        </View>
+        <Text style={styles.demoBoundary}>합성 데모 데이터 · 실제 이메일, 전화, 로그인 연결 없음</Text>
+      </View>
+
+      <View style={styles.commandComposer} accessibilityLabel="합성 예시 요청">
+        <View style={styles.commandRail} accessibilityElementsHidden />
+        <View style={styles.commandBody}>
+          <Text accessibilityRole="header" aria-level={1} style={styles.commandTitle}>예시 요청을 확인해 보세요</Text>
+          <TextInput
+            accessibilityLabel="합성 예시 요청 내용"
+            multiline
+            editable={false}
+            style={styles.commandInput}
+            value={commandText}
+          />
+          <View style={[styles.commandActions, !isTablet && styles.commandActionsMobile]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="음성으로 요청하기"
+              onPress={() => setNotice("음성 입력 연결 전입니다. 입력한 문장으로 요청을 확인해 주세요.")}
+              style={({ pressed }) => [styles.voiceButton, pressed && styles.voiceButtonPressed]}
+            >
+              <Text style={styles.voiceButtonIcon}>●</Text>
+              <Text style={styles.voiceButtonText}>음성</Text>
+            </Pressable>
+            <ActionButton
+              label="예시 요청 불러오기"
+              variant="primary"
+              loading={busyKey === "import-call"}
+              disabled={Boolean(busyKey) && busyKey !== "import-call"}
+              onPress={() => {
+                setActiveTab("work");
+                setSelectedLane("request");
+                if (!request) void runPackageAction({ action: "import", source: "call" }, "import-call");
+              }}
+            />
+          </View>
         </View>
       </View>
 
       {notice ? (
         <FeedbackPanel tone="info" title="최신 상태로 동기화했습니다" description={notice} />
       ) : null}
+      {resetError ? <FeedbackPanel tone="error" title={resetError.title} description={resetError.description} /> : null}
 
       <GovernanceSurface style={[styles.workShell, isWide && styles.workShellWide]} accessibilityLabel="업무 대기열">
+        <View style={styles.nextWorkHeading}>
+          <Text style={styles.nextWorkTitle}>다음 업무</Text>
+          <Text style={styles.nextWorkContext}>Cobalt Finance Center · 5층</Text>
+        </View>
         <WorkLanePicker
           activeLane={activeLane}
           requestStatus={packageStatus(packageDraft, request, publicationReady)}
@@ -335,16 +424,44 @@ export default function Home() {
       <PublishedSnapshot
         published={published}
         error={errors.published}
-        busy={busyKey === "published-refresh"}
-        onRefresh={async () => {
-          setBusyKey("published-refresh");
-          await refreshPublished();
-          setBusyKey(null);
-        }}
       />
 
       </ScrollView>
-    </>
+      <BottomNavigation
+        activeTab={activeTab}
+        onSelect={(tab) => {
+          setActiveTab(tab);
+          if (tab === "work") setSelectedLane("request");
+          if (tab === "reports") setSelectedLane("report");
+          if (tab === "records") setNotice("업무 기록은 요청과 보고의 결정 이력에서 확인할 수 있습니다.");
+        }}
+      />
+    </View>
+  );
+}
+
+function BottomNavigation({ activeTab, onSelect }: {
+  activeTab: "home" | "work" | "records" | "reports";
+  onSelect: (tab: "home" | "work" | "records" | "reports") => void;
+}) {
+  return (
+    <View style={styles.bottomNavigation} accessibilityRole="tablist">
+      {BOTTOM_NAV_TABS.map((tab) => {
+        const selected = tab.key === activeTab;
+        return (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            key={tab.key}
+            onPress={() => onSelect(tab.key)}
+            style={({ pressed }) => [styles.bottomNavigationItem, selected && styles.bottomNavigationItemSelected, pressed && styles.bottomNavigationItemPressed]}
+          >
+            <Text style={[styles.bottomNavigationGlyph, selected && styles.bottomNavigationTextSelected]}>{tab.glyph}</Text>
+            <Text style={[styles.bottomNavigationLabel, selected && styles.bottomNavigationTextSelected]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -407,11 +524,9 @@ function WorkLaneButton({ label, status, selected, onPress }: {
   );
 }
 
-function PublishedSnapshot({ published, error, busy, onRefresh }: {
+function PublishedSnapshot({ published, error }: {
   published: MobilePublishedSnapshot | null;
   error: SurfaceError | null;
-  busy: boolean;
-  onRefresh: () => void;
 }) {
   return (
     <GovernanceSurface style={styles.sectionSurface} accessibilityLabel="현재 임대 정보">
@@ -419,11 +534,10 @@ function PublishedSnapshot({ published, error, busy, onRefresh }: {
         eyebrow="현재 임대 정보"
         title="Cobalt Finance Center · 5층"
         description="고객 안내에 사용하는 최신 정보입니다."
-        action={<ActionButton label="새로고침" variant="ghost" compact onPress={onRefresh} loading={busy} />}
       />
       <Divider />
       {error ? (
-        <FeedbackPanel tone="error" title={error.title} description="잠시 후 새로고침해 주세요." />
+        <FeedbackPanel tone="error" title={error.title} description="잠시 후 다시 불러와 주세요." />
       ) : published ? (
         <View style={styles.dataGrid}>
           <DataRow label="임대 면적" value={`${published.marketed_area_py}평`} tone="verified" />
@@ -474,22 +588,11 @@ function RequestWorkspace({ workflow, request, packageDraft, error, busyKey, pub
 
       {workflow && !request ? (
         <View style={styles.taskStack}>
-          <Text style={styles.sourcePreview}>{demoRequest.text}</Text>
-          <View style={styles.actionCluster}>
-            <ActionButton
-              label="통화 요청 불러오기"
-              variant="primary"
-              loading={busyKey === "import-call"}
-              disabled={Boolean(busyKey) && busyKey !== "import-call"}
-              onPress={() => void onAction({ action: "import", source: "call" }, "import-call")}
-            />
-            <ActionButton
-              label="이메일 요청 불러오기"
-              loading={busyKey === "import-email"}
-              disabled={Boolean(busyKey) && busyKey !== "import-email"}
-              onPress={() => void onAction({ action: "import", source: "email" }, "import-email")}
-            />
-          </View>
+          <FeedbackPanel
+            tone="info"
+            title="요청을 입력해 주세요"
+            description="화면 위 입력란에서 요청을 확인하면 준비할 업무가 이곳에 이어집니다."
+          />
         </View>
       ) : null}
 
@@ -553,7 +656,7 @@ function PackageStage({ pkg, busyKey, onAction }: {
   if (pkg.status === "sent") {
     return (
       <View style={styles.taskStack}>
-        <FeedbackPanel tone="success" title="전달 기록을 저장했습니다" description="데모 전달 내역을 업무 기록에 저장했습니다." />
+        <FeedbackPanel tone="success" title="전달 기록을 저장했습니다" description="발송 결과를 업무 기록에 저장했습니다." />
         <PackageReview pkg={pkg} />
       </View>
     );
@@ -617,7 +720,7 @@ function PackageStage({ pkg, busyKey, onAction }: {
         <View style={styles.taskStack}>
           <FeedbackPanel tone="success" title="승인이 완료되었습니다" description="받는 사람과 첨부 자료를 한 번 더 확인하세요." />
           <ActionButton
-            label="데모로 전달하기"
+            label="확인하고 발송하기"
             variant="primary"
             loading={busyKey === "send-package"}
             disabled={Boolean(busyKey) && busyKey !== "send-package"}
@@ -757,7 +860,7 @@ function ReportWorkspace({ workflow, report, error, busyKey, publicationReady, o
             <View style={styles.taskStack}>
               <FeedbackPanel tone="success" title="승인이 완료되었습니다" description="받는 사람과 첨부 파일을 한 번 더 확인하세요." />
               <ActionButton
-                label="데모로 전달하기"
+                label="확인하고 발송하기"
                 variant="primary"
                 loading={busyKey === "send-report"}
                 disabled={Boolean(busyKey) && busyKey !== "send-report"}
@@ -767,7 +870,7 @@ function ReportWorkspace({ workflow, report, error, busyKey, publicationReady, o
           ) : null}
 
           {report.status === "sent" ? (
-            <FeedbackPanel tone="success" title="보고서 전달 기록을 저장했습니다" description="데모 전달 내역을 건물 업무 기록에 저장했습니다." />
+            <FeedbackPanel tone="success" title="보고서 전달 기록을 저장했습니다" description="발송 결과를 건물 업무 기록에 저장했습니다." />
           ) : null}
         </View>
       ) : null}
@@ -796,7 +899,7 @@ function CommandPicker({ reportId, busyKey, onAction, columns }: {
                 loading={busyKey === key}
                 disabled={Boolean(busyKey) && busyKey !== key}
                 onPress={() => void onAction({ action: "investigate", report_id: reportId, command }, key)}
-                hint="이번 주 데모 자료에서 관련 내용을 확인합니다"
+                hint="이번 주 저장된 업무 자료에서 관련 내용을 확인합니다"
               />
             </View>
           );
@@ -1037,7 +1140,7 @@ function requestTaskCopy(
 ) {
   if (pkg?.status === "sent") return { title: "전달 완료", description: "전달한 안내 자료와 기록을 확인할 수 있습니다." };
   if (pkg?.status === "stale") return { title: "안내 자료 다시 만들기", description: "임대 정보가 바뀌었습니다. 최신 내용으로 다시 준비해 주세요." };
-  if (pkg?.status === "approved") return { title: "받는 사람과 자료 확인", description: "확인 후 데모 전달 기록을 남기세요." };
+  if (pkg?.status === "approved") return { title: "받는 사람과 자료 확인", description: "확인 후 발송 기록을 남기세요. 실제 이메일은 전송되지 않습니다." };
   if (pkg?.status === "edit_pending") return { title: "제안 문구 확인", description: "변경 전후를 비교하고 사용할 문구를 선택하세요." };
   if (pkg?.status === "draft") return { title: "안내 자료 검토", description: "고객에게 전달할 내용과 첨부 자료를 확인하세요." };
   if (request?.status === "confirmed" && !publicationReady) return { title: "최신 정보 반영 대기", description: "요청 확인을 마쳤습니다. 관리자 검토가 끝나면 안내 자료를 만들 수 있습니다." };
@@ -1051,7 +1154,7 @@ function reportTaskCopy(report: MobileReportView | undefined, publicationReady: 
   if (!report) return { title: "이번 주 보고서 만들기", description: "이번 주 활동을 모아 건물별 초안을 준비합니다." };
   if (report.status === "sent") return { title: "보고서 전달 완료", description: "전달한 보고서와 기록을 확인할 수 있습니다." };
   if (report.status === "stale") return { title: "보고서 다시 만들기", description: "바뀐 정보를 반영해 새 초안을 준비해 주세요." };
-  if (report.status === "approved") return { title: "받는 사람과 보고서 확인", description: "확인 후 데모 전달 기록을 남기세요." };
+  if (report.status === "approved") return { title: "받는 사람과 보고서 확인", description: "확인 후 발송 기록을 남기세요. 실제 이메일은 전송되지 않습니다." };
   if (report.status === "patch_pending") return { title: "제안 내용 확인", description: "변경 내용과 근거를 확인하고 반영 여부를 선택하세요." };
   if (report.accepted_patch_count) return { title: "보고서 승인", description: "반영된 내용과 받는 사람을 확인한 뒤 승인하세요." };
   return { title: "보고서 내용 확인", description: "확인할 항목을 선택해 이번 주 변동을 검토하세요." };
@@ -1148,18 +1251,46 @@ function friendlyFactLabel(label: string): string {
 }
 
 const styles = StyleSheet.create({
+  appFrame: { backgroundColor: colors.canvas, flex: 1 },
   screen: { backgroundColor: colors.canvas, flex: 1 },
-  content: { alignSelf: "center", gap: space.region, maxWidth: layout.contentMax, paddingBottom: space.page, paddingHorizontal: space.control, paddingTop: space.panel, width: "100%" },
+  content: { alignSelf: "center", gap: space.region, maxWidth: layout.contentMax, paddingBottom: 132, paddingHorizontal: space.control, paddingTop: space.panel, width: "100%" },
   contentTablet: { paddingHorizontal: space.panel, paddingTop: space.section },
   contentWide: { paddingHorizontal: space.region, paddingTop: space.page },
   topbar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: space.control, justifyContent: "space-between" },
   brandCluster: { alignItems: "center", flexDirection: "row", gap: space.compact },
   brandMark: { alignItems: "center", backgroundColor: colors.surface1, borderColor: colors.border, borderRadius: radius.medium, borderWidth: control.border, height: icon.brand, justifyContent: "center", width: icon.brand },
   brandMarkInner: { backgroundColor: colors.emerald500, borderRadius: radius.small, height: icon.brandInner, transform: [{ rotate: "45deg" }], width: icon.brandInner },
-  brand: { color: colors.text1, fontFamily: fonts.body, fontSize: type.h3, fontWeight: "600", letterSpacing: tracking.brand },
+  brand: { color: "#173047", fontFamily: fonts.body, fontSize: 27, fontWeight: "700", letterSpacing: -0.8 },
   brandSubline: { color: colors.text3, fontFamily: fonts.body, fontSize: type.label, letterSpacing: 0, marginTop: control.focusOffset },
   topbarMeta: { flexDirection: "row", flexShrink: 1, flexWrap: "wrap", gap: space.tight, maxWidth: "100%", minWidth: 0, width: "auto" },
   topbarMetaTablet: { justifyContent: "flex-end", width: "auto" },
+  profileMark: { alignItems: "center", backgroundColor: "#173047", borderRadius: radius.pill, height: control.touch, justifyContent: "center", width: control.touch },
+  profileMarkText: { color: colors.surface1, fontFamily: fonts.body, fontSize: type.body, fontWeight: "600" },
+  demoContext: { alignItems: "center", backgroundColor: colors.surface1, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexDirection: "row", flexWrap: "wrap", gap: space.compact, padding: space.compact },
+  demoLabels: { alignItems: "center", flexBasis: 220, flexDirection: "row", flexGrow: 1, flexShrink: 1, flexWrap: "wrap", gap: space.tight, minWidth: 0 },
+  demoResetMobile: { flexBasis: "100%", minWidth: 0 },
+  demoBoundary: { color: colors.text3, flexBasis: "100%", fontFamily: fonts.body, fontSize: type.label, lineHeight: lineHeight.label },
+  commandComposer: { alignItems: "stretch", flexDirection: "row", gap: space.control, maxWidth: layout.longCopyMax, minWidth: 0, width: "100%" },
+  commandRail: { backgroundColor: colors.emerald500, borderRadius: radius.pill, width: 3 },
+  commandBody: { flex: 1, gap: space.group, minWidth: 0, paddingVertical: space.tight },
+  commandTitle: { color: "#173047", fontFamily: fonts.body, fontSize: 31, fontWeight: "600", letterSpacing: -0.9, lineHeight: 39 },
+  commandInput: { backgroundColor: colors.surface1, borderColor: colors.border, borderRadius: radius.inner, borderWidth: control.border, color: colors.text1, fontFamily: fonts.body, fontSize: type.body, lineHeight: lineHeight.body, minHeight: 112, minWidth: 0, padding: space.control, width: "100%", textAlignVertical: "top" },
+  commandActions: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: space.compact, justifyContent: "flex-end" },
+  commandActionsMobile: { alignItems: "stretch", flexDirection: "column" },
+  voiceButton: { alignItems: "center", backgroundColor: colors.surface1, borderColor: colors.border, borderRadius: radius.pill, borderWidth: control.border, flexDirection: "row", gap: space.tight, minHeight: control.touch, paddingHorizontal: space.control },
+  voiceButtonPressed: { backgroundColor: colors.surface2, transform: [{ scale: 0.985 }] },
+  voiceButtonIcon: { color: "#173047", fontSize: 9 },
+  voiceButtonText: { color: colors.text1, fontFamily: fonts.body, fontSize: type.bodySmall, fontWeight: "600" },
+  nextWorkHeading: { alignItems: "flex-end", flexDirection: "row", flexWrap: "wrap", gap: space.tight, justifyContent: "space-between", marginBottom: space.group },
+  nextWorkTitle: { color: "#173047", fontFamily: fonts.body, fontSize: type.h2, fontWeight: "600", letterSpacing: tracking.h2 },
+  nextWorkContext: { color: colors.text3, fontFamily: fonts.body, fontSize: type.bodySmall },
+  bottomNavigation: { alignItems: "stretch", backgroundColor: "rgba(255,255,255,0.98)", borderTopColor: colors.border, borderTopWidth: control.border, bottom: 0, flexDirection: "row", left: 0, paddingBottom: Platform.OS === "ios" ? 24 : 10, paddingHorizontal: space.tight, paddingTop: space.tight, position: "absolute", right: 0, ...surfaceDepth },
+  bottomNavigationItem: { alignItems: "center", borderTopColor: "transparent", borderTopWidth: 2, flex: 1, gap: space.hairline, justifyContent: "center", minHeight: 54, paddingHorizontal: space.hairline },
+  bottomNavigationItemSelected: { borderTopColor: colors.emerald500 },
+  bottomNavigationItemPressed: { backgroundColor: colors.surface2 },
+  bottomNavigationGlyph: { color: colors.text3, fontFamily: fonts.body, fontSize: type.h3, lineHeight: lineHeight.h3 },
+  bottomNavigationLabel: { color: colors.text3, fontFamily: fonts.body, fontSize: type.label, fontWeight: "500", lineHeight: lineHeight.label, textAlign: "center" },
+  bottomNavigationTextSelected: { color: colors.emerald500, fontWeight: "700" },
   pageHeading: { alignItems: "flex-end", flexDirection: "row", flexWrap: "wrap", gap: space.control, justifyContent: "space-between" },
   pageHeadingCopy: { flexGrow: 1, flexShrink: 1, maxWidth: "100%", minWidth: 0 },
   pageTitle: { color: colors.text1, fontFamily: fonts.body, fontSize: 28, fontWeight: "600", letterSpacing: tracking.h2, lineHeight: 34 },

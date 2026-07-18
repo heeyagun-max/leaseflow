@@ -1,5 +1,7 @@
 # LeaseFlow Design System
 
+> v3.0.0 화면·서비스 계층의 상세 결정은 `docs/design/LEASEFLOW_SERVICE_LAYER_AND_DESIGN_MANIFEST_v3.0.0_KO.md`를 따른다. 이 문서와 충돌할 경우 v3.0.0 매니페스트를 우선한다.
+
 ## 0. Research log
 
 - 2026-07-18 redesign: the owner rejected the shipped dark developer-console language and the exposure of internal policy copy. The new direction is a calm global knowledge-work product for office teams.
@@ -9,7 +11,7 @@
 
 ## 1. Product atmosphere
 
-LeaseFlow is a quiet, precise workplace for people who review property information, coordinate decisions, and prepare external material. It should feel credible in a global enterprise: warm paper canvas, crisp white work surfaces, strong typography, restrained blue actions, and clear editorial spacing.
+LeaseFlow is a quiet, precise workplace for people who review property information, coordinate decisions, and prepare external material. It should feel like a trusted operations ledger in a global enterprise: warm paper canvas, an ink-navy admin rail, crisp white work surfaces, strong typography, restrained blue actions, and clear editorial spacing.
 
 The product is not a system console. The primary interface speaks about the user's work, not the implementation. Technical metadata exists only where it helps troubleshooting or review and is progressively disclosed.
 
@@ -65,7 +67,8 @@ Semantic tokens are the only color source in components.
 - Body contrast targets WCAG 2.2 AA. Status never relies on color alone.
 - Blue is reserved for links, focus, selected navigation, and the primary action.
 - Green means completed or ready. Amber means attention. Neither decorates neutral content.
-- No gradients, dark console chrome, luminous borders, or large tinted panels.
+- The admin sidebar may use `#173047` as a stable navigation anchor. Main work areas remain light.
+- No decorative gradients, dark console workspaces, luminous borders, or large tinted panels.
 
 ## 3. Typography and voice
 
@@ -114,7 +117,7 @@ Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
 
 - Desktop uses a 12-column conceptual grid with 32px gutters; tablet 24px; mobile 16px.
 - Required QA widths are 375, 768, and 1280px. Primary content must never require horizontal scrolling.
-- Admin navigation remains compact and sticky only when it does not steal vertical workspace.
+- Admin navigation uses the v3.0.0 fixed eight-item sidebar at desktop widths and a compact horizontal navigation below 62rem.
 - Primary/secondary layouts use a wide work area and a 280–320px action rail. They stack before content becomes cramped.
 - Repeated facts use intrinsic grids. Tables are reserved for real row comparison, not decorative metrics.
 - On mobile, sections form one reading column and actions follow the content they affect.
@@ -174,7 +177,8 @@ Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
 ## 6. Mobile product contract
 
 - Mobile uses the same warm palette and typography, adapted for touch and outdoor readability.
-- The opening view is a task queue, not a marketing hero or dashboard summary. Its first viewport must contain the next permitted action.
+- The opening view begins with a natural-language or voice request composer, followed by the next task. It is never a marketing hero or dashboard summary.
+- Bottom navigation is fixed to four items in this order: Home, Assigned work, Work records, Weekly report. Buildings are filtered entities, not a fifth tab.
 - The page title is 24–28px on mobile. Supporting copy is at most one short sentence and must never compete with the title.
 - Requests and weekly reports appear before reference data. The active task names the outcome and places its action directly below it.
 - Do not repeat the same workflow state in a hero, metric card, and task card. Do not show seeded or fallback counts when no actual task exists.

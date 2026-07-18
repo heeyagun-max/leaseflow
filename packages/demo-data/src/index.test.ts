@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import { createInitialWeeklyReportState, createWeeklyReportDraft } from "@leaseflow/domain";
 
 import {
+  createMobilePublishedSnapshot,
   createDemoWeeklyReportDraftInput,
   createInitialDemoState,
   currentDemoWeeklyReportMaterialIds,
+  demoAssetRegistrationInputs,
   demoMockOutlookMessages,
   demoWeeklyReportRecipientGroup,
   migrateDemoStateToV3,
@@ -69,6 +71,48 @@ describe("persistent demo state schema v3", () => {
     expect(migrated.operations.requests).toEqual(legacy.operations.requests);
     expect(migrated.operations.reports).toEqual({ reports: [], activities: [], audit: [] });
     expect("reports" in legacy.operations).toBe(false);
+  });
+});
+
+describe("synthetic governed asset registry projection", () => {
+  it("keeps the checked-in synthetic registration fixture aligned with typed seed inputs", () => {
+    expect(readFixture("source_asset_registry.json")).toEqual(demoAssetRegistrationInputs);
+  });
+
+  it("seeds every required source category without exposing restricted or candidate sources", () => {
+    const state = createInitialDemoState();
+    expect(new Set(state.asset_registry.assets.map((asset) => asset.document_category))).toEqual(new Set([
+      "perspective_render", "building_flyer", "portfolio_flyer", "floor_plan", "area_workbook", "legal_document",
+    ]));
+    expect(createMobilePublishedSnapshot(state).source_assets.map((asset) => asset.filename)).toEqual(["CFC_5F_plan_v1.svg"]);
+  });
+
+  it("never projects an unpublished newer floor-plan candidate", () => {
+    const state = createInitialDemoState();
+    const snapshot = createMobilePublishedSnapshot(state);
+    expect(state.asset_registry.assets.find((asset) => asset.id === "asset-cobalt-plan-v2")?.status).toBe("registered");
+    expect(JSON.stringify(snapshot.source_assets)).not.toContain("CFC_5F_plan_v2.svg");
+    expect(JSON.stringify(snapshot.source_assets)).not.toContain("workbook");
+    expect(JSON.stringify(snapshot.source_assets)).not.toContain("legal");
+  });
+
+  it("never projects an externally visible asset from outside the mobile building scope", () => {
+    const state = createInitialDemoState();
+    const published = state.asset_registry.assets.find((asset) => asset.id === "asset-cobalt-plan-v1")!;
+    state.asset_registry.assets.push({
+      ...published,
+      id: "asset-foreign-flyer",
+      observed_filenames: ["Synthetic_Foreign_building_flyer_202607.pdf"],
+      synthetic_fingerprint: "synthetic:foreign-flyer-202607",
+      building_id: "bld-foreign",
+      building_alias_candidate: "Foreign Demo Tower",
+      document_category: "building_flyer",
+      version_family: "building-flyer:foreign-building-flyer",
+      linked_file_version_id: null,
+      supersedes: null,
+    });
+
+    expect(createMobilePublishedSnapshot(state).source_assets.map((asset) => asset.filename)).toEqual(["CFC_5F_plan_v1.svg"]);
   });
 });
 

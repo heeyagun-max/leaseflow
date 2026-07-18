@@ -15,6 +15,11 @@ export async function GET() {
         ...state,
         records: state.records.filter((record) => record.status === "published"),
         files: state.files.filter((file) => file.status === "published"),
+        asset_registry: {
+          assets: state.asset_registry.assets.filter((asset) =>
+            !asset.linked_file_version_id
+            || state.files.some((file) => file.id === asset.linked_file_version_id && file.status === "published")),
+        },
       }
       : state;
     return NextResponse.json({

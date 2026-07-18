@@ -247,8 +247,8 @@ export function ReportConsole() {
         draft: "현재 자산 정보를 기준으로 주간 보고서 초안을 만들었습니다.",
         investigate: "확인 결과를 변경안으로 준비했습니다. 근거를 확인한 뒤 반영 여부를 결정해 주세요.",
         decide_patch: options.decision === "accept" ? "선택한 변경안을 보고서에 반영했습니다." : "변경안을 반영하지 않았습니다. 기존 보고서는 그대로 유지됩니다.",
-        approve: "보고서 승인을 마쳤습니다. 이제 데모 전달을 진행할 수 있습니다.",
-        send: "데모 전달을 기록했습니다. 실제 이메일은 발송되지 않았습니다.",
+        approve: "보고서 승인을 마쳤습니다. 이제 발송 기록을 남길 수 있습니다.",
+        send: "발송 기록을 저장했습니다. 실제 이메일은 전송되지 않았습니다.",
       };
       setNotice({ severity: "success", message: messages[action] });
     } catch (error) {
@@ -295,9 +295,7 @@ export function ReportConsole() {
               <h1>이번 주 변동을 확인하고 <span>보고서를 완성하세요.</span></h1>
               <p>저장된 업무 기록을 살펴보고, 필요한 변경만 검토한 뒤 승인합니다.</p>
             </div>
-            <div className="lf-product-hero__meta">
-              <StatusBadge tone="info">데모</StatusBadge>
-            </div>
+            <div className="lf-product-hero__meta"><StatusBadge tone="info">보고 준비</StatusBadge></div>
           </header>
 
           {notice ? (
@@ -327,7 +325,7 @@ export function ReportConsole() {
                 <dl className="lf-data-grid">
                   <DataFact label="자산 정보" value={canDraft ? "게시 완료" : "게시 전"} detail="보고서 기준 정보" state={canDraft ? "verified" : "default"} />
                   <DataFact label="담당자" value="임대 관리자" detail="Cobalt Finance Center" />
-                  <DataFact label="전달 방식" value="데모" detail="실제 이메일은 발송되지 않습니다" />
+                  <DataFact label="전달 방식" value="발송 기록" detail="실제 이메일은 전송되지 않습니다" />
                 </dl>
               </GovernanceSurface>
             </section>
@@ -346,7 +344,7 @@ export function ReportConsole() {
                     <WorkflowStep index={1} state={reportLifecycleStepState(reportProgress!, "draft")} title="초안 작성">현재 자산 정보</WorkflowStep>
                     <WorkflowStep index={2} state={reportLifecycleStepState(reportProgress!, "investigate")} title="변동 확인">업무 기록 검토</WorkflowStep>
                     <WorkflowStep index={3} state={reportLifecycleStepState(reportProgress!, "approve")} title="최종 승인">내용과 수신자 확인</WorkflowStep>
-                    <WorkflowStep index={4} state={reportLifecycleStepState(reportProgress!, "send")} title="전달">데모 전달 기록</WorkflowStep>
+                    <WorkflowStep index={4} state={reportLifecycleStepState(reportProgress!, "send")} title="전달">발송 기록</WorkflowStep>
                   </ol>
                   {report.status === "stale" ? (
                     <div className="lf-inline-feedback" role="alert">
@@ -373,7 +371,7 @@ export function ReportConsole() {
                     </div>
                     <div className="lf-attachment-row">
                       <div><span className="lf-data-label">첨부 파일</span><strong>{report.attachments[0]?.filename ?? "첨부 없음"}</strong></div>
-                      <details className="lf-technical-details"><summary>참고 정보</summary><code>{report.attachments[0]?.version_id ?? "없음"}</code></details>
+                      <span>승인된 최신 파일</span>
                     </div>
                   </GovernanceSurface>
                 </section>
@@ -404,7 +402,7 @@ export function ReportConsole() {
                       ))}
                     </div>
                     <p className="lf-support-copy">
-                      데모 이메일과 업무 기록만 사용합니다. 비공개 메일은 결과에 포함되지 않습니다.
+                      저장된 이메일 자료와 업무 기록만 사용합니다. 비공개 메일은 결과에 포함되지 않습니다.
                     </p>
                   </GovernanceSurface>
                 </aside>
@@ -428,7 +426,7 @@ export function ReportConsole() {
                             <span className="lf-confidence" aria-label={`자료 일치도 ${Math.round(finding.confidence * 100)}퍼센트`}>
                               {Math.round(finding.confidence * 100)}%
                             </span>
-                            <div><strong>{friendlyReportSentence(finding.finding)}</strong><details className="lf-technical-details"><summary>근거 자료</summary><code>{finding.source_reference_ids.join(" · ")}</code></details></div>
+                            <div><strong>{friendlyReportSentence(finding.finding)}</strong><span>{finding.source_reference_ids.length}개 자료에서 확인</span></div>
                           </article>
                         ))}
                       </div>
@@ -438,7 +436,7 @@ export function ReportConsole() {
                           <article key={`${operation.section}-${operation.operation}-${operation.source_reference_ids.join("-")}`}>
                             <header>
                               <div><span className="lf-data-label">제안 변경</span><strong>{sectionLabels[operation.section as keyof ReportSections] ?? operation.section}</strong></div>
-                              <details className="lf-technical-details"><summary>근거 자료</summary><code>{operation.source_reference_ids.join(" · ")}</code></details>
+                              <span>{operation.source_reference_ids.length}개 자료에서 확인</span>
                             </header>
                             <div className="lf-operation-diff">
                               <div><span>현재 내용</span><pre>{stringifyDiffValue(operation.before)}</pre></div>
@@ -483,7 +481,7 @@ export function ReportConsole() {
                         <span className="lf-data-label">참조</span>
                         <ul>{report.recipients.cc.map((recipient) => <li key={recipient.email}>{recipient.email}<span>{recipientRoleLabel(recipient.role)}</span></li>)}</ul>
                       </div>
-                      <details className="lf-technical-details"><summary>수신자 설정</summary><code>{report.recipients.configuration_id}</code></details>
+                      <span>등록된 보고 그룹</span>
                     </div>
                   </GovernanceSurface>
                   <GovernanceSurface variant={report.status === "approved" || report.status === "sent" ? "accent" : "subtle"}>
@@ -513,10 +511,10 @@ export function ReportConsole() {
                           trailingIcon={<ArrowUpRightIcon />}
                           variant="secondary"
                         >
-                          데모 전달하기
+                          확인하고 발송 기록 남기기
                         </ActionButton>
                       </div>
-                      <p className="lf-support-copy">데모 데이터만 사용하며 실제 이메일·전화·로그인 연동은 없습니다.</p>
+                      <p className="lf-support-copy">발송 기록만 저장하며 실제 이메일·전화·로그인 연결은 사용하지 않습니다.</p>
                     </div>
                   </GovernanceSurface>
                 </div>
@@ -531,7 +529,6 @@ export function ReportConsole() {
                         <div><span className="lf-data-label">{sourceTypeLabels[source.source_type] ?? "업무 자료"}</span><strong>{source.summary}</strong></div>
                         <div>
                           <time dateTime={source.occurred_at}>{source.occurred_at}</time>
-                          <details className="lf-technical-details"><summary>참고 정보</summary><code>{source.id}</code></details>
                         </div>
                       </article>
                     ))}

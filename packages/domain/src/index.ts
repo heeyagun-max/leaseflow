@@ -14,6 +14,311 @@ export type UserRole =
   | "team_lead"
   | "admin";
 
+export const ASSET_DOCUMENT_CATEGORIES = [
+  "perspective_render",
+  "building_flyer",
+  "portfolio_flyer",
+  "floor_plan",
+  "area_workbook",
+  "legal_document",
+] as const;
+
+export type AssetDocumentCategory = (typeof ASSET_DOCUMENT_CATEGORIES)[number];
+export type AssetConfidentiality = "internal" | "restricted" | "legal_restricted" | "public_candidate";
+export type AssetLifecycleStatus = "registered" | "steward_confirmed" | "published" | "superseded" | "duplicate" | "rejected";
+export type AssetClassificationState = "candidate" | "confirmed" | "manual_review";
+export type AssetExtractionState = "not_started" | "candidate_ready" | "unsupported" | "reviewed";
+
+export interface AssetAuditProvenance {
+  event: "registered" | "filename_observed" | "classified" | "steward_confirmed" | "published" | "superseded";
+  actor_id: string;
+  occurred_at: string;
+  details: Record<string, unknown>;
+}
+
+export interface GovernedSourceAsset {
+  id: string;
+  observed_filenames: string[];
+  synthetic_fingerprint: string;
+  mime_type: string;
+  extension: string;
+  byte_size: number;
+  building_id: string | null;
+  building_alias_candidate: string | null;
+  source_organization: string;
+  document_category: AssetDocumentCategory;
+  artifact_date: string | null;
+  effective_date: string | null;
+  confidentiality: AssetConfidentiality;
+  externally_shareable: boolean;
+  status: AssetLifecycleStatus;
+  classification_state: AssetClassificationState;
+  version_family: string;
+  segmentation_marker: string | null;
+  linked_file_version_id: string | null;
+  duplicate_of: string | null;
+  supersedes: string | null;
+  extraction_method: "deterministic_metadata" | "text_candidate" | "manual";
+  extraction_state: AssetExtractionState;
+  review_decision: "pending" | "confirmed" | "rejected";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  active: boolean;
+  authorized: boolean;
+  audit_provenance: AssetAuditProvenance[];
+}
+
+export interface GovernedAssetRegistry {
+  assets: GovernedSourceAsset[];
+}
+
+export interface RegisterSourceAssetInput {
+  id: string;
+  observed_filename: string;
+  synthetic_fingerprint: string;
+  mime_type: string;
+  byte_size: number;
+  building_alias_candidate: string | null;
+  building_id: string | null;
+  source_organization: string;
+  linked_file_version_id?: string | null;
+  occurred_at: string;
+}
+
+const restrictedAssetCategories = new Set<AssetDocumentCategory>(["area_workbook", "legal_document"]);
+
+function filenameArtifactDate(filename: string): string | null {
+  const compact = filename.match(/(?:^|[^0-9])(20\d{2})[-_.]?(0[1-9]|1[0-2])[-_.]?([0-2]\d|3[01])(?:[^0-9]|$)/);
+  return compact ? `${compact[1]}-${compact[2]}-${compact[3]}` : null;
+}
+
+function classifyAssetFilename(filename: string): {
+  category: AssetDocumentCategory;
+  confidentiality: AssetConfidentiality;
+  versionFamily: string;
+  segmentationMarker: string | null;
+} {
+  const lower = filename.toLowerCase();
+  const stem = lower.replace(/\.[^.]+$/, "").replace(/[^a-z0-9가-힣]+/g, "-").replace(/^-|-$/g, "");
+  const date = filenameArtifactDate(filename);
+  if (/portfolio|포트폴리오/.test(lower)) {
+    return {
+      category: "portfolio_flyer",
+      confidentiality: "public_candidate",
+      versionFamily: `portfolio-edition:${date ?? stem}`,
+      segmentationMarker: "portfolio-wide",
+    };
+  }
+  if (/legal|contract|agreement|계약|법무/.test(lower)) {
+    return { category: "legal_document", confidentiality: "legal_restricted", versionFamily: `legal:${stem}`, segmentationMarker: null };
+  }
+  if (/area|면적|rent[_ -]?roll/.test(lower) || /\.xlsx?$/.test(lower)) {
+    return { category: "area_workbook", confidentiality: "restricted", versionFamily: `workbook:${stem.replace(/-v\d+$/, "")}`, segmentationMarker: null };
+  }
+  if (/plan|도면/.test(lower) || /\.(dwg|dxf)$/.test(lower)) {
+    const planFamily = stem.replace(/-20\d{6}$/, "").replace(/-v?\d+$/, "");
+    return { category: "floor_plan", confidentiality: "public_candidate", versionFamily: `floor-plan:${planFamily}`, segmentationMarker: null };
+  }
+  if (/render|perspective|perspetive|투시도/.test(lower)) {
+    return { category: "perspective_render", confidentiality: "public_candidate", versionFamily: `render:${stem}`, segmentationMarker: null };
+  }
+  const flyerFamily = stem.replace(/-20\d{4}(?:\d{2})?$/, "").replace(/-v?\d+$/, "");
+  return { category: "building_flyer", confidentiality: "public_candidate", versionFamily: `building-flyer:${flyerFamily}`, segmentationMarker: "single-building" };
+}
+
+export function registerSourceAsset(
+  registry: GovernedAssetRegistry,
+  input: RegisterSourceAssetInput,
+): GovernedAssetRegistry {
+  if (!input.synthetic_fingerprint.startsWith("synthetic:")) {
+    throw new Error("Only synthetic asset fingerprints are accepted in demo mode.");
+  }
+  if (input.byte_size < 0 || !Number.isSafeInteger(input.byte_size)) throw new Error("Asset byte size must be a non-negative integer.");
+  const existing = registry.assets.find((asset) => asset.synthetic_fingerprint === input.synthetic_fingerprint);
+  if (existing) {
+    const observed = existing.observed_filenames.includes(input.observed_filename)
+      ? existing.observed_filenames
+      : [...existing.observed_filenames, input.observed_filename];
+    return {
+      assets: registry.assets.map((asset) => asset.id === existing.id ? {
+        ...asset,
+        observed_filenames: observed,
+        audit_provenance: observed === existing.observed_filenames ? asset.audit_provenance : [...asset.audit_provenance, {
+          event: "filename_observed",
+          actor_id: "system",
+          occurred_at: input.occurred_at,
+          details: { observed_filename: input.observed_filename },
+        }],
+      } : asset),
+    };
+  }
+
+  const extension = input.observed_filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
+  const classification = classifyAssetFilename(input.observed_filename);
+  const unsupportedCad = extension === "dwg" || extension === "dxf";
+  const asset: GovernedSourceAsset = {
+    id: input.id,
+    observed_filenames: [input.observed_filename],
+    synthetic_fingerprint: input.synthetic_fingerprint,
+    mime_type: input.mime_type,
+    extension,
+    byte_size: input.byte_size,
+    building_id: input.building_id,
+    building_alias_candidate: input.building_alias_candidate,
+    source_organization: input.source_organization,
+    document_category: classification.category,
+    artifact_date: filenameArtifactDate(input.observed_filename),
+    effective_date: null,
+    confidentiality: classification.confidentiality,
+    externally_shareable: false,
+    status: "registered",
+    classification_state: unsupportedCad ? "manual_review" : "candidate",
+    version_family: classification.versionFamily,
+    segmentation_marker: classification.segmentationMarker,
+    linked_file_version_id: input.linked_file_version_id ?? null,
+    duplicate_of: null,
+    supersedes: null,
+    extraction_method: unsupportedCad ? "manual" : "deterministic_metadata",
+    extraction_state: unsupportedCad ? "unsupported" : "candidate_ready",
+    review_decision: "pending",
+    reviewed_by: null,
+    reviewed_at: null,
+    active: false,
+    authorized: false,
+    audit_provenance: [
+      { event: "registered", actor_id: "system", occurred_at: input.occurred_at, details: { source_organization: input.source_organization } },
+      { event: "classified", actor_id: "system", occurred_at: input.occurred_at, details: { candidate_only: true } },
+    ],
+  };
+  return { assets: [...registry.assets, asset] };
+}
+
+export function confirmSourceAsset(
+  registry: GovernedAssetRegistry,
+  input: { asset_id: string; building_id: string; externally_shareable: boolean; actor: { id: string; role: UserRole }; occurred_at: string },
+): GovernedAssetRegistry {
+  requireAction(input.actor.role, "candidate.confirm");
+  const target = registry.assets.find((asset) => asset.id === input.asset_id);
+  if (!target) throw new Error(`Unknown source asset: ${input.asset_id}.`);
+  if (target.status !== "registered" || target.classification_state !== "candidate") {
+    throw new Error("Only supported classification candidates can be confirmed.");
+  }
+  if (!target.building_id || !target.building_alias_candidate) throw new Error("Unresolved building alias blocks confirmation.");
+  if (target.building_id !== input.building_id) throw new Error("Wrong-building confirmation is blocked.");
+  if (input.externally_shareable && restrictedAssetCategories.has(target.document_category)) {
+    throw new Error("Restricted legal or workbook sources cannot be made externally shareable by classification.");
+  }
+  return {
+    assets: registry.assets.map((asset) => asset.id === target.id ? {
+      ...asset,
+      externally_shareable: input.externally_shareable,
+      status: "steward_confirmed",
+      classification_state: "confirmed",
+      extraction_state: "reviewed",
+      review_decision: "confirmed",
+      reviewed_by: input.actor.id,
+      reviewed_at: input.occurred_at,
+      authorized: true,
+      audit_provenance: [...asset.audit_provenance, {
+        event: "steward_confirmed",
+        actor_id: input.actor.id,
+        occurred_at: input.occurred_at,
+        details: { building_id: input.building_id, externally_shareable: input.externally_shareable },
+      }],
+    } : asset),
+  };
+}
+
+export function publishSourceAsset(
+  registry: GovernedAssetRegistry,
+  input: {
+    asset_id: string;
+    actor: { id: string; role: UserRole };
+    occurred_at: string;
+    current_linked_file_versions?: ReadonlyMap<string, string>;
+  },
+): GovernedAssetRegistry {
+  requireAction(input.actor.role, "record.publish");
+  const target = registry.assets.find((asset) => asset.id === input.asset_id);
+  if (!target) throw new Error(`Unknown source asset: ${input.asset_id}.`);
+  if (target.status !== "steward_confirmed" || target.classification_state !== "confirmed" || !target.authorized) {
+    throw new Error("Data Steward confirmation and authorization are required before publication.");
+  }
+  if (!target.building_id || !target.building_alias_candidate) throw new Error("Unresolved building alias blocks publication.");
+  if (target.extraction_state === "unsupported") throw new Error("Unsupported CAD extraction blocks publication.");
+  if (target.document_category === "floor_plan"
+    && (!target.linked_file_version_id
+      || input.current_linked_file_versions?.get(target.linked_file_version_id) !== target.building_id)) {
+    throw new Error("Floor-plan publication requires a matching current linked file version.");
+  }
+  if (restrictedAssetCategories.has(target.document_category) || target.confidentiality !== "public_candidate" || !target.externally_shareable) {
+    throw new Error("Confidential or non-shareable sources cannot be published externally.");
+  }
+
+  const priors = registry.assets.filter((asset) => asset.id !== target.id
+    && asset.status === "published"
+    && asset.building_id === target.building_id
+    && asset.version_family === target.version_family);
+  const prior = priors.at(-1);
+  return {
+    assets: registry.assets.map((asset) => {
+      if (asset.id === target.id) return {
+        ...asset,
+        status: "published" as const,
+        active: true,
+        supersedes: prior?.id ?? asset.supersedes,
+        audit_provenance: [...asset.audit_provenance, {
+          event: "published" as const,
+          actor_id: input.actor.id,
+          occurred_at: input.occurred_at,
+          details: { supersedes: prior?.id ?? null },
+        }],
+      };
+      if (priors.some((candidate) => candidate.id === asset.id)) return {
+        ...asset,
+        status: "superseded" as const,
+        active: false,
+        audit_provenance: [...asset.audit_provenance, {
+          event: "superseded" as const,
+          actor_id: input.actor.id,
+          occurred_at: input.occurred_at,
+          details: { successor_id: target.id },
+        }],
+      };
+      return asset;
+    }),
+  };
+}
+
+export function isDerivedCurrentAsset(
+  asset: GovernedSourceAsset,
+  assets: readonly GovernedSourceAsset[],
+): boolean {
+  if (asset.status !== "published" || !asset.active) return false;
+  return !assets.some((candidate) =>
+    candidate.id !== asset.id
+    && candidate.status === "published"
+    && candidate.active
+    && candidate.building_id === asset.building_id
+    && candidate.version_family === asset.version_family
+    && candidate.supersedes === asset.id,
+  );
+}
+
+export function selectExternallyVisibleAssets(
+  assets: readonly GovernedSourceAsset[],
+  scope?: { building_id: string },
+): GovernedSourceAsset[] {
+  return assets.filter((asset) =>
+    asset.status === "published"
+    && asset.active
+    && (!scope || asset.building_id === scope.building_id)
+    && isDerivedCurrentAsset(asset, assets)
+    && asset.authorized
+    && asset.externally_shareable,
+  );
+}
+
 export interface VersionedRecord {
   id: string;
   building_id: string;

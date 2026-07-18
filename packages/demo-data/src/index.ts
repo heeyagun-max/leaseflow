@@ -1,16 +1,22 @@
 import {
   createInitialOperationalState,
   createInitialWeeklyReportState,
+  confirmSourceAsset,
   EXPECTED_PUBLICATION_FIELDS,
+  publishSourceAsset,
+  registerSourceAsset,
   requireExternalRecord,
   selectCurrentFloorPlan,
   selectCurrentPublished,
+  selectExternallyVisibleAssets,
   type CandidateChange,
+  type AssetDocumentCategory,
   type ConfiguredReportRecipients,
   type CreateWeeklyReportDraftInput,
   type ExpectedPublicationField,
   type FileVersion,
   type GovernedPublicationState,
+  type GovernedAssetRegistry,
   type DraftMaterial,
   type OperationalState,
   type ReportSourceReference,
@@ -72,25 +78,56 @@ export interface DemoOperationalState extends OperationalState {
 export interface DemoState extends GovernedPublicationState<DemoRecord, DemoFileVersion> {
   schema_version: 3;
   source_id: "src-cobalt-jul";
+  asset_registry: GovernedAssetRegistry;
   operations: DemoOperationalState;
 }
 
-export type LegacyDemoStateV2 = Omit<DemoState, "schema_version" | "operations"> & {
+export type LegacyDemoStateV2 = Omit<DemoState, "schema_version" | "operations" | "asset_registry"> & {
   schema_version: 2;
   operations: OperationalState;
+  asset_registry?: GovernedAssetRegistry;
 };
 
 export function migrateDemoStateToV3(state: DemoState | LegacyDemoStateV2): DemoState {
   const cloned = structuredClone(state);
-  if (cloned.schema_version === 3) return cloned;
   return {
     ...cloned,
     schema_version: 3,
+    asset_registry: cloned.asset_registry ?? createInitialAssetRegistry(),
     operations: {
       ...cloned.operations,
-      reports: createInitialWeeklyReportState(),
+      reports: "reports" in cloned.operations ? cloned.operations.reports : createInitialWeeklyReportState(),
     },
   };
+}
+
+export const demoAssetRegistrationInputs = [
+  { id: "asset-cobalt-render", observed_filename: "Synthetic_Cobalt_perspective_render_20260701.svg", synthetic_fingerprint: "synthetic:render-cobalt-20260701", mime_type: "image/svg+xml", byte_size: 2300, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Asset Studio", occurred_at: "2026-07-18T00:00:00.000Z" },
+  { id: "asset-cobalt-flyer", observed_filename: "Synthetic_Cobalt_building_flyer_20260701.pdf", synthetic_fingerprint: "synthetic:flyer-cobalt-20260701", mime_type: "application/pdf", byte_size: 8400, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Leasing Lab", occurred_at: "2026-07-18T00:01:00.000Z" },
+  { id: "asset-portfolio-july", observed_filename: "Synthetic_Portfolio_flyer_20260718.pdf", synthetic_fingerprint: "synthetic:portfolio-20260718", mime_type: "application/pdf", byte_size: 9200, building_alias_candidate: "Portfolio", building_id: "bld-cobalt", source_organization: "Synthetic Leasing Lab", occurred_at: "2026-07-18T00:02:00.000Z" },
+  { id: "asset-cobalt-plan-v1", observed_filename: "CFC_5F_plan_v1.svg", synthetic_fingerprint: "synthetic:cobalt-plan-v1", mime_type: "image/svg+xml", byte_size: 3100, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Design Office", linked_file_version_id: "file-cobalt-plan-v1", occurred_at: "2026-07-18T00:03:00.000Z" },
+  { id: "asset-cobalt-plan-v2", observed_filename: "CFC_5F_plan_v2.svg", synthetic_fingerprint: "synthetic:cobalt-plan-v2", mime_type: "image/svg+xml", byte_size: 3300, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Design Office", linked_file_version_id: "file-cobalt-plan-v2", occurred_at: "2026-07-18T00:04:00.000Z" },
+  { id: "asset-cobalt-area", observed_filename: "Synthetic_Cobalt_area_workbook_20260718.xlsx", synthetic_fingerprint: "synthetic:cobalt-area-20260718", mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", byte_size: 6100, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Asset Management", occurred_at: "2026-07-18T00:05:00.000Z" },
+  { id: "asset-cobalt-legal", observed_filename: "Synthetic_Cobalt_legal_agreement_20260718.pdf", synthetic_fingerprint: "synthetic:cobalt-legal-20260718", mime_type: "application/pdf", byte_size: 7200, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Legal Office", occurred_at: "2026-07-18T00:06:00.000Z" },
+  { id: "asset-cobalt-cad", observed_filename: "Synthetic_Cobalt_5F_plan_working.dwg", synthetic_fingerprint: "synthetic:cobalt-cad-working", mime_type: "application/acad", byte_size: 12500, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt", source_organization: "Synthetic Design Office", occurred_at: "2026-07-18T00:07:00.000Z" },
+] as const;
+
+export function createInitialAssetRegistry(): GovernedAssetRegistry {
+  let registry: GovernedAssetRegistry = { assets: [] };
+  for (const input of demoAssetRegistrationInputs) registry = registerSourceAsset(registry, input);
+  registry = confirmSourceAsset(registry, {
+    asset_id: "asset-cobalt-plan-v1",
+    building_id: "bld-cobalt",
+    externally_shareable: true,
+    actor: { id: "usr-junior", role: "data_steward" },
+    occurred_at: "2026-07-18T00:08:00.000Z",
+  });
+  return publishSourceAsset(registry, {
+    asset_id: "asset-cobalt-plan-v1",
+    actor: { id: "usr-senior", role: "senior_reviewer" },
+    occurred_at: "2026-07-18T00:09:00.000Z",
+    current_linked_file_versions: new Map([["file-cobalt-plan-v1", "bld-cobalt"]]),
+  });
 }
 
 const initialRecords: DemoRecord[] = [
@@ -118,6 +155,7 @@ export function createInitialDemoState(): DemoState {
     candidates: [],
     records: initialRecords,
     files: initialFiles,
+    asset_registry: createInitialAssetRegistry(),
     audit: [],
     operations: {
       ...createInitialOperationalState(),
@@ -269,6 +307,13 @@ export interface MobilePublishedSnapshot {
   };
   fact_sources: Record<"marketed_area" | "rent_free" | "supported_parking", { version_id: string; source_pointer: string }>;
   blocked_floor_plans: string[];
+  source_assets: Array<{
+    filename: string;
+    category: AssetDocumentCategory;
+    artifact_date: string | null;
+    version_family: string;
+    download_url: string | null;
+  }>;
 }
 
 const mobileScope = { building_id: "bld-cobalt", floor: "5F" } as const;
@@ -315,6 +360,17 @@ export function createMobilePublishedSnapshot(state: DemoState): MobilePublished
         && file.file_type === "floor_plan"
         && (file.superseded || file.status === "superseded"))
       .map((file) => file.filename),
+    source_assets: selectExternallyVisibleAssets(state.asset_registry.assets, mobileScope)
+      .filter((asset) => asset.document_category !== "floor_plan" || asset.linked_file_version_id === plan.id)
+      .map((asset) => ({
+        filename: asset.observed_filenames[0]!,
+        category: asset.document_category,
+        artifact_date: asset.artifact_date,
+        version_family: asset.version_family,
+        download_url: asset.document_category === "floor_plan"
+          ? `/api/mobile/files/${encodeURIComponent(asset.observed_filenames[0]!)}`
+          : null,
+      })),
   };
 }
 

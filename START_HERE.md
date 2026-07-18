@@ -16,6 +16,7 @@ The hackathon build is an **architecture-complete but functionally narrow vertic
 4. Keep one primary Codex thread for most core development.
 5. Ask Codex to read, in order:
    - `AGENTS.md`
+   - `CURRENT_VERSION_AND_MANIFEST.md`
    - `README.md`
    - `docs/PRODUCT_DIRECTION.md`
    - `docs/HACKATHON_MVP_SCOPE.md`
@@ -28,6 +29,10 @@ The hackathon build is an **architecture-complete but functionally narrow vertic
    - `prompts/codex_master_prompt.md`
 6. Paste `prompts/codex_master_prompt.md` into the primary build thread.
 7. Run `/feedback` in the primary thread before submission and save the Session ID.
+
+## Canonical version rule
+
+`CURRENT_VERSION_AND_MANIFEST.md` is the naming and packaging authority. The only approved final-package baseline is `LeaseFlow_Final_Master_Package_v3.0.0.zip`, whose extracted top-level folder must be `LeaseFlow_Final_Master_Package_v3.0.0`. Do not describe older ZIPs or planning documents as the current master.
 
 ## First milestone
 

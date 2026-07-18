@@ -6,6 +6,7 @@ import {
   approveWeeklyReport,
   canPerform,
   canSendExternal,
+  confirmSourceAsset,
   confirmCandidates,
   confirmOperationalRequest,
   createInitialOperationalState,
@@ -17,13 +18,16 @@ import {
   importOperationalRequest,
   markWeeklyReportStale,
   publishConfirmedBatch,
+  publishSourceAsset,
   proposePackageEdit,
   proposeWeeklyReportPatch,
   recordExtraction,
+  registerSourceAsset,
   renderOperationalPackageBody,
   selectCurrentFloorPlan,
   selectCurrentPublished,
   selectExternalReportableSources,
+  selectExternallyVisibleAssets,
   sendOperationalPackage,
   sendWeeklyReport,
   validateLandlordRecipients,
@@ -33,11 +37,190 @@ import {
   type CreateWeeklyReportDraftInput,
   type FileVersion,
   type GovernedPublicationState,
+  type GovernedAssetRegistry,
   type VersionedRecord,
   type WeeklyReportPatchCandidate,
   type WeeklyReportSections,
   type WeeklyReportState,
 } from "./index";
+
+function registeredAsset(overrides: Partial<Parameters<typeof registerSourceAsset>[1]> = {}): GovernedAssetRegistry {
+  return registerSourceAsset({ assets: [] }, {
+    id: "asset-plan-v1",
+    observed_filename: "Cobalt_5F_plan_v1_20260718.svg",
+    synthetic_fingerprint: "synthetic:plan-v1",
+    mime_type: "image/svg+xml",
+    byte_size: 1200,
+    building_alias_candidate: "Cobalt Finance Center",
+    building_id: "bld-cobalt",
+    source_organization: "Synthetic Asset Studio",
+    linked_file_version_id: "file-cobalt-plan-v1",
+    occurred_at: "2026-07-18T01:00:00.000Z",
+    ...overrides,
+  });
+}
+
+describe("governed source asset registry", () => {
+  const steward = { id: "usr-junior", role: "data_steward" as const };
+  const senior = { id: "usr-senior", role: "senior_reviewer" as const };
+
+  function confirm(registry: GovernedAssetRegistry, assetId = registry.assets[0]!.id, shareable = true) {
+    return confirmSourceAsset(registry, {
+      asset_id: assetId,
+      building_id: "bld-cobalt",
+      externally_shareable: shareable,
+      actor: steward,
+      occurred_at: "2026-07-18T02:00:00.000Z",
+    });
+  }
+
+  function publish(registry: GovernedAssetRegistry, assetId = registry.assets.at(-1)!.id) {
+    return publishSourceAsset(registry, {
+      asset_id: assetId,
+      actor: senior,
+      occurred_at: "2026-07-18T03:00:00.000Z",
+      current_linked_file_versions: new Map([
+        ["file-cobalt-plan-v1", "bld-cobalt"],
+        ["file-cobalt-plan-v2", "bld-cobalt"],
+      ]),
+    });
+  }
+
+  it("deduplicates exact synthetic fingerprints while retaining both observed names", () => {
+    const first = registeredAsset();
+    const second = registerSourceAsset(first, {
+      ...{
+        id: "asset-plan-copy",
+        observed_filename: "renamed_current_plan.svg",
+        synthetic_fingerprint: "synthetic:plan-v1",
+        mime_type: "image/svg+xml",
+        byte_size: 1200,
+        building_alias_candidate: "Cobalt Finance Center",
+        building_id: "bld-cobalt",
+        source_organization: "Synthetic Asset Studio",
+        occurred_at: "2026-07-18T01:05:00.000Z",
+      },
+    });
+    expect(second.assets).toHaveLength(1);
+    expect(second.assets[0]?.observed_filenames).toEqual([
+      "Cobalt_5F_plan_v1_20260718.svg",
+      "renamed_current_plan.svg",
+    ]);
+  });
+
+  it("treats a filename date as artifact date, never effective date", () => {
+    const asset = registeredAsset().assets[0]!;
+    expect(asset.artifact_date).toBe("2026-07-18");
+    expect(asset.effective_date).toBeNull();
+  });
+
+  it("separates portfolio editions into explicit version families and segmentation", () => {
+    const first = registeredAsset({ id: "portfolio-june", observed_filename: "Synthetic_Portfolio_20260630.pdf", synthetic_fingerprint: "synthetic:portfolio-june", mime_type: "application/pdf" });
+    const second = registerSourceAsset(first, {
+      id: "portfolio-july", observed_filename: "Synthetic_Portfolio_20260718.pdf", synthetic_fingerprint: "synthetic:portfolio-july",
+      mime_type: "application/pdf", byte_size: 1400, building_alias_candidate: "Portfolio", building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Studio", occurred_at: "2026-07-18T01:05:00.000Z",
+    });
+    expect(second.assets.map((asset) => asset.version_family)).toEqual([
+      "portfolio-edition:2026-06-30",
+      "portfolio-edition:2026-07-18",
+    ]);
+    expect(second.assets.every((asset) => asset.segmentation_marker === "portfolio-wide")).toBe(true);
+  });
+
+  it.each([
+    ["Synthetic_area_register_20260718.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    ["Synthetic_legal_agreement_20260718.pdf", "application/pdf"],
+  ])("keeps restricted workbook/legal source out of external output: %s", (filename, mimeType) => {
+    const registry = registeredAsset({ observed_filename: filename, mime_type: mimeType, synthetic_fingerprint: `synthetic:${filename}` });
+    expect(() => confirm(registry)).toThrow(/Restricted legal or workbook/);
+    expect(selectExternallyVisibleAssets(registry.assets)).toEqual([]);
+  });
+
+  it("routes DWG-like input to unsupported manual review", () => {
+    const asset = registeredAsset({ observed_filename: "Cobalt_5F_plan_v3.dwg", mime_type: "application/acad", synthetic_fingerprint: "synthetic:dwg" }).assets[0]!;
+    expect(asset).toMatchObject({ classification_state: "manual_review", extraction_method: "manual", extraction_state: "unsupported" });
+    expect(() => confirm({ assets: [asset] })).toThrow(/supported classification candidates/);
+  });
+
+  it("recognizes the common perspetive filename typo as a perspective render", () => {
+    const asset = registeredAsset({
+      observed_filename: "Synthetic_Cobalt_perspetive_20260718.svg",
+      synthetic_fingerprint: "synthetic:perspetive-render",
+    }).assets[0]!;
+    expect(asset.document_category).toBe("perspective_render");
+  });
+
+  it("blocks unresolved aliases and wrong-building confirmations", () => {
+    const unresolved = registeredAsset({ building_id: null, building_alias_candidate: "Unknown Tower" });
+    expect(() => confirm(unresolved)).toThrow(/Unresolved building alias/);
+    const wrong = registeredAsset({ building_id: "bld-other" });
+    expect(() => confirm(wrong)).toThrow(/Wrong-building/);
+    const forgedWrongBuilding = {
+      assets: wrong.assets.map((asset) => ({
+        ...asset,
+        status: "steward_confirmed" as const,
+        classification_state: "confirmed" as const,
+        externally_shareable: true,
+        authorized: true,
+      })),
+    };
+    expect(() => publish(forgedWrongBuilding)).toThrow(/matching current linked file version/);
+  });
+
+  it("publishing a newer floor plan supersedes and blocks the old plan", () => {
+    const oldPublished = publish(confirm(registeredAsset()));
+    const withNew = registerSourceAsset(oldPublished, {
+      id: "asset-plan-v2", observed_filename: "Cobalt_5F_plan_v2_20260719.svg", synthetic_fingerprint: "synthetic:plan-v2",
+      mime_type: "image/svg+xml", byte_size: 1300, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Studio", occurred_at: "2026-07-19T01:00:00.000Z",
+      linked_file_version_id: "file-cobalt-plan-v2",
+    });
+    const published = publish(confirm(withNew, "asset-plan-v2"), "asset-plan-v2");
+    expect(published.assets.find((asset) => asset.id === "asset-plan-v1")).toMatchObject({ status: "superseded", active: false });
+    expect(published.assets.find((asset) => asset.id === "asset-plan-v2")).toMatchObject({ status: "published", supersedes: "asset-plan-v1" });
+    expect(selectExternallyVisibleAssets(published.assets).map((asset) => asset.id)).toEqual(["asset-plan-v2"]);
+  });
+
+  it("publishing a newer building-flyer edition supersedes the prior version family", () => {
+    const oldRegistered = registeredAsset({
+      id: "flyer-june",
+      observed_filename: "Cobalt_building_flyer_202606.pdf",
+      synthetic_fingerprint: "synthetic:flyer-june",
+      mime_type: "application/pdf",
+      linked_file_version_id: null,
+    });
+    const oldPublished = publish(confirm(oldRegistered, "flyer-june"), "flyer-june");
+    const withNew = registerSourceAsset(oldPublished, {
+      id: "flyer-july", observed_filename: "Cobalt_building_flyer_202607.pdf", synthetic_fingerprint: "synthetic:flyer-july",
+      mime_type: "application/pdf", byte_size: 1500, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Studio", occurred_at: "2026-07-19T01:00:00.000Z",
+    });
+    const published = publish(confirm(withNew, "flyer-july"), "flyer-july");
+
+    expect(published.assets.find((asset) => asset.id === "flyer-june")).toMatchObject({ status: "superseded", active: false });
+    expect(published.assets.find((asset) => asset.id === "flyer-july")).toMatchObject({
+      status: "published",
+      supersedes: "flyer-june",
+      version_family: "building-flyer:cobalt-building-flyer",
+    });
+    expect(selectExternallyVisibleAssets(published.assets).map((asset) => asset.id)).toEqual(["flyer-july"]);
+  });
+
+  it("admits only assets satisfying all five external gates", () => {
+    const published = publish(confirm(registeredAsset()));
+    const good = published.assets[0]!;
+    const failedGates = [
+      { ...good, id: "not-published", status: "steward_confirmed" as const },
+      { ...good, id: "inactive", active: false },
+      { ...good, id: "not-current", version_family: "stale-family" },
+      { ...good, id: "unauthorized", authorized: false },
+      { ...good, id: "not-shareable", externally_shareable: false },
+      { ...good, id: "current-successor", version_family: "stale-family", supersedes: "not-current", externally_shareable: false },
+    ];
+    expect(selectExternallyVisibleAssets([good, ...failedGates]).map((asset) => asset.id)).toEqual([good.id]);
+  });
+});
 
 const versions: VersionedRecord[] = [
   {id:"v1", building_id:"b1", version_no:1, status:"superseded", valid_from:"2026-06-01", valid_to:"2026-07-17", superseded:true, external_shareable:true},

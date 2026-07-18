@@ -6,6 +6,7 @@ import { POST as confirm } from "../app/api/demo/confirm/route";
 import { POST as extract } from "../app/api/demo/extract/route";
 import { POST as publish } from "../app/api/demo/publish/route";
 import { POST as reset } from "../app/api/demo/reset/route";
+import { POST as mutateAsset } from "../app/api/demo/assets/route";
 import { GET as workflow } from "../app/api/demo/workflow/route";
 import { GET as mobileFile } from "../app/api/mobile/files/[filename]/route";
 import { GET as mobilePublished } from "../app/api/mobile/published/route";
@@ -24,7 +25,7 @@ describe.sequential("synthetic demo route boundary", () => {
   it("fails closed for every demo workflow route unless DEMO_MODE is exactly true", async () => {
     vi.stubEnv("DEMO_MODE", "false");
     expect((await workflow()).status).toBe(404);
-    for (const handler of [extract, confirm, publish, reset]) {
+    for (const handler of [extract, confirm, publish, reset, mutateAsset]) {
       const request = new Request("http://localhost/api/demo/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

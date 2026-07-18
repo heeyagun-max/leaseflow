@@ -1,0 +1,33 @@
+services:
+  admin:
+    build:
+      context: .
+      dockerfile: deploy/admin.Dockerfile
+    environment:
+      DEMO_MODE: "true"
+      SANDBOX_EMAIL_MODE: "true"
+      OPENAI_STORE: "false"
+      LEASEFLOW_DEMO_STATE_PATH: /app/data/demo/.runtime/state.v1.json
+    ports:
+      - "3000:3000"
+    tmpfs:
+      - /app/data/demo/.runtime:uid=1000,gid=1000,mode=0700
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/demo/workflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  mobile:
+    build:
+      context: .
+      dockerfile: deploy/mobile.Dockerfile
+      args:
+        EXPO_PUBLIC_LEASEFLOW_API_URL: http://localhost:3000
+    ports:
+      - "8081:8081"
+    depends_on:
+      admin:
+        condition: service_healthy
+    restart: unless-stopped

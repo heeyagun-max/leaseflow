@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -101,6 +101,30 @@ describe("persistent governed demo store", () => {
     ]);
   });
 
+  it("persists Steward and Senior asset decisions and requires the current linked floor-plan version", async () => {
+    const { store } = await storeFixture();
+    const initial = await store.getState();
+    const confirmed = await store.confirmAsset({
+      actor_id: "usr-junior", expected_revision: initial.revision, asset_id: "asset-cobalt-plan-v2",
+      building_id: "bld-cobalt", externally_shareable: true, occurred_at: "2026-07-18T08:00:00.000Z",
+    });
+    await expect(store.publishAsset({
+      actor_id: "usr-senior", expected_revision: confirmed.revision, asset_id: "asset-cobalt-plan-v2",
+      occurred_at: "2026-07-18T08:01:00.000Z",
+    })).rejects.toThrow(/matching current linked file version/);
+
+    const extracted = await store.extract({ actor_id: "usr-junior", expected_revision: confirmed.revision }, demoExtractionResult);
+    const factsConfirmed = await store.confirm({ actor_id: "usr-junior", expected_revision: extracted.revision });
+    const factsPublished = await store.publish({ actor_id: "usr-senior", expected_revision: factsConfirmed.revision });
+    const assetPublished = await store.publishAsset({
+      actor_id: "usr-senior", expected_revision: factsPublished.revision, asset_id: "asset-cobalt-plan-v2",
+      occurred_at: "2026-07-18T08:05:00.000Z",
+    });
+    expect(assetPublished.asset_registry.assets.find((asset) => asset.id === "asset-cobalt-plan-v1")).toMatchObject({ status: "superseded", active: false });
+    expect(assetPublished.asset_registry.assets.find((asset) => asset.id === "asset-cobalt-plan-v2")).toMatchObject({ status: "published", supersedes: "asset-cobalt-plan-v1" });
+    expect(createMobilePublishedSnapshot(assetPublished).source_assets.map((asset) => asset.filename)).toEqual(["CFC_5F_plan_v2.svg"]);
+  });
+
   it("persists only schema-valid mapped extraction candidates", async () => {
     const { store } = await storeFixture();
     const initial = await store.getState();
@@ -136,6 +160,19 @@ describe("persistent governed demo store", () => {
     await expect(store.getState()).rejects.toThrow(/multiple current published versions/);
   });
 
+  it("adds the governed asset registry to an existing schema-v3 state without changing official records", async () => {
+    const { store, statePath } = await storeFixture();
+    const current = createInitialDemoState();
+    const { asset_registry: _assetRegistry, ...legacyV3 } = current;
+    await writeFile(statePath, JSON.stringify(legacyV3), "utf8");
+    const migrated = await store.getState();
+    expect(migrated.records).toEqual(current.records);
+    expect(migrated.files).toEqual(current.files);
+    expect(migrated.asset_registry.assets.length).toBeGreaterThan(0);
+    const persisted = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>;
+    expect(persisted).toHaveProperty("asset_registry");
+  });
+
   it("scopes current and blocked mobile data to the Cobalt 5F field and file type", () => {
     const state = createInitialDemoState();
     const otherRecords: DemoRecord[] = [
@@ -163,7 +200,10 @@ describe("persistent governed demo store", () => {
     const extracted = await store.extract({ actor_id: "usr-junior", expected_revision: 0 }, demoExtractionResult);
     const confirmed = await store.confirm({ actor_id: "usr-junior", expected_revision: extracted.revision });
     const published = await store.publish({ actor_id: "usr-senior", expected_revision: confirmed.revision });
-    const officialBefore = { records: published.records, files: published.files, stage: published.stage, candidates: published.candidates };
+    const officialBefore = {
+      records: published.records, files: published.files, asset_registry: published.asset_registry,
+      stage: published.stage, candidates: published.candidates,
+    };
     const imported = await store.importRequest({
       actor_id: "usr-manager", expected_revision: published.revision, request_id: "request-call-1", source: "call",
       source_id: "activity-call-cobalt", raw_text: "synthetic request", extraction: demoRequestExtraction("call"),
@@ -191,7 +231,10 @@ describe("persistent governed demo store", () => {
     expect(sentB.operations.activities).toHaveLength(1);
     const reloaded = await new DemoFileStore(statePath).getState();
     expect(reloaded.operations.activities).toHaveLength(1);
-    expect({ records: reloaded.records, files: reloaded.files, stage: reloaded.stage, candidates: reloaded.candidates }).toEqual(officialBefore);
+    expect({
+      records: reloaded.records, files: reloaded.files, asset_registry: reloaded.asset_registry,
+      stage: reloaded.stage, candidates: reloaded.candidates,
+    }).toEqual(officialBefore);
     const reset = await store.reset({ actor_id: "usr-manager", expected_revision: reloaded.revision, occurred_at: "2026-07-18T12:00:00.000Z" });
     expect(reset.revision).toBe(reloaded.revision + 1);
     expect(reset.operations).toEqual({
