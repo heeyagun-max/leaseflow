@@ -1,0 +1,19 @@
+{
+  "id": "src-cobalt-jul",
+  "building_id": "bld-cobalt",
+  "title": "Cobalt Finance Center July Leasing Update",
+  "effective_date": "2026-07-18",
+  "source_type": "monthly_owner_update",
+  "content": {
+    "floor": "5F",
+    "previous_marketed_area_py": 300,
+    "current_marketed_area_py": 200,
+    "reason": "100 py occupied by another tenant",
+    "previous_rent_free_months": 3,
+    "current_rent_free_months": 2,
+    "previous_supported_parking_spaces": 3,
+    "current_supported_parking_spaces": 2,
+    "previous_plan": "CFC_5F_plan_v1.svg",
+    "current_plan": "CFC_5F_plan_v2.svg"
+  }
+}

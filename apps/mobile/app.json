@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "LeaseFlow Copilot",
+    "slug": "leaseflow-copilot",
+    "scheme": "leaseflow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "plugins": ["expo-router"],
+    "web": {"bundler": "metro", "output": "static"},
+    "experiments": {"typedRoutes": true}
+  }
+}

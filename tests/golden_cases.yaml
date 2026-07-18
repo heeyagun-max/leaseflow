@@ -1,0 +1,74 @@
+version: 2
+cases:
+  - id: junior_cannot_publish
+    role: data_steward
+    action: record.publish
+    expect_allowed: false
+
+  - id: senior_can_publish
+    role: senior_reviewer
+    action: record.publish
+    expect_allowed: true
+
+  - id: source_change_extraction
+    input: data/demo/source_update.json
+    expect_changes:
+      - {field: marketed_area_py, previous: 300, proposed: 200}
+      - {field: floor_plan, previous: CFC_5F_plan_v1.svg, proposed: CFC_5F_plan_v2.svg}
+      - {field: rent_free_months, previous: 3, proposed: 2}
+      - {field: supported_parking_spaces, previous: 3, proposed: 2}
+
+  - id: mobile_before_publication
+    condition: candidate_not_published
+    expect:
+      current_marketed_area_py: 300
+      current_plan: CFC_5F_plan_v1.svg
+      candidate_visible_to_mobile: false
+
+  - id: mobile_after_publication
+    condition: senior_published
+    expect:
+      current_marketed_area_py: 200
+      current_plan: CFC_5F_plan_v2.svg
+      blocked_plan: CFC_5F_plan_v1.svg
+      rent_free_months: 2
+      supported_parking_spaces: 2
+
+  - id: request_extraction
+    input: data/demo/call_request.json
+    expect:
+      building_id: bld-cobalt
+      floor: 5F
+      requested_fields: [marketed_area, rent_free, supported_parking]
+      requested_files: [current_floor_plan]
+      deadline: today afternoon
+
+  - id: external_package_gate
+    given:
+      approved: false
+      unresolved_count: 0
+      facts_current_published_shareable: true
+      files_current_published_shareable: true
+    expect_send_allowed: false
+
+  - id: weekly_report_sources
+    given: [leaseflow_activity, mock_outlook]
+    expect:
+      both_sources_used: true
+      internal_only_excluded: true
+      source_ids_visible: true
+
+  - id: command_area_change
+    command: 협의 중인 면적 변동 있는지 확인해
+    expect:
+      finding: marketed area 300 py -> 200 py
+      source_backed: true
+      patch_scoped_to: bld-cobalt
+      official_data_overwrite: false
+
+  - id: landlord_recipient_rule
+    input: data/demo/recipient_group.json
+    expect:
+      to_roles: [to_landlord_practical]
+      cc_roles: [cc_landlord_team, cc_landlord_exec, cc_lm_team, cc_lm_exec]
+      external_report: true

@@ -1,0 +1,21 @@
+{
+  "id": "activity-call-cobalt",
+  "channel": "call_transcript",
+  "occurred_at": "2026-07-18T10:42:00+09:00",
+  "contact": "Alex Chen",
+  "organization": "Northbridge Advisory",
+  "text": "코발트 파이낸스센터 5층 최신 임대 가능 면적하고 렌트프리, 지원 주차 대수, 최신 평면도 정리해서 오늘 오후에 보내주세요. 기존 300평 자료 말고 지금 가능한 면적으로 부탁드립니다.",
+  "expected_task": {
+    "building_id": "bld-cobalt",
+    "floor": "5F",
+    "requested_fields": [
+      "marketed_area",
+      "rent_free",
+      "supported_parking"
+    ],
+    "requested_files": [
+      "current_floor_plan"
+    ],
+    "deadline": "today afternoon"
+  }
+}

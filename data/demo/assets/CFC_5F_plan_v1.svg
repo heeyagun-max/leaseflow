@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520">
+  <rect width="900" height="520" fill="#f8fafc"/>
+  <rect x="60" y="60" width="780" height="360" fill="#e2e8f0" stroke="#0f172a" stroke-width="5"/>
+  <rect x="340" y="155" width="220" height="170" fill="#ffffff" stroke="#64748b" stroke-width="3"/>
+  <rect x="60" y="60" width="390" height="360" fill="#d9f99d" fill-opacity="0.78" stroke="#65a30d" stroke-width="5"/>
+  <text x="125" y="240" font-family="Arial" font-size="42" font-weight="700" fill="#365314">Marketed 300 py</text>
+  <text x="60" y="475" font-family="Arial" font-size="26" fill="#475569">CFC 5F plan v1 — superseded after July update</text>
+</svg>

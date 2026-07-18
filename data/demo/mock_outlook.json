@@ -1,0 +1,29 @@
+[
+  {
+    "id": "mail-001",
+    "thread_id": "thread-cobalt",
+    "occurred_at": "2026-07-16T09:30:00+09:00",
+    "direction": "inbound",
+    "subject": "Cobalt Finance Center 5F area update",
+    "body": "100 py has been occupied. Please use the revised 200 py marketing plan after approval.",
+    "share_scope": "external_reportable"
+  },
+  {
+    "id": "mail-002",
+    "thread_id": "thread-cobalt",
+    "occurred_at": "2026-07-17T13:15:00+09:00",
+    "direction": "inbound",
+    "subject": "Revised incentives and parking support",
+    "body": "Rent-free is revised to two months and supported parking is two spaces. Senior approval is pending.",
+    "share_scope": "client_confidential"
+  },
+  {
+    "id": "mail-003",
+    "thread_id": "thread-cobalt",
+    "occurred_at": "2026-07-18T11:05:00+09:00",
+    "direction": "outbound",
+    "subject": "Cobalt Finance Center 5F materials",
+    "body": "Approved package prepared and sent through LeaseFlow sandbox.",
+    "share_scope": "external_reportable"
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "av-cobalt-5f-v1",
+    "building_id": "bld-cobalt",
+    "floor": "5F",
+    "marketed_area_py": 300,
+    "status": "published",
+    "valid_from": "2026-06-01",
+    "valid_to": "2026-07-17",
+    "version_no": 1,
+    "superseded": true,
+    "external_shareable": true
+  },
+  {
+    "id": "av-cobalt-5f-v2",
+    "building_id": "bld-cobalt",
+    "floor": "5F",
+    "marketed_area_py": 200,
+    "status": "candidate",
+    "valid_from": "2026-07-18",
+    "valid_to": null,
+    "version_no": 2,
+    "superseded": false,
+    "external_shareable": true
+  },
+  {
+    "id": "term-cobalt-rf-v1",
+    "building_id": "bld-cobalt",
+    "field": "rent_free_months",
+    "value": 3,
+    "status": "published",
+    "valid_from": "2026-06-01",
+    "valid_to": "2026-07-17",
+    "version_no": 1,
+    "superseded": true,
+    "external_shareable": true
+  },
+  {
+    "id": "term-cobalt-rf-v2",
+    "building_id": "bld-cobalt",
+    "field": "rent_free_months",
+    "value": 2,
+    "status": "candidate",
+    "valid_from": "2026-07-18",
+    "valid_to": null,
+    "version_no": 2,
+    "superseded": false,
+    "external_shareable": true
+  },
+  {
+    "id": "term-cobalt-park-v1",
+    "building_id": "bld-cobalt",
+    "field": "supported_parking_spaces",
+    "value": 3,
+    "status": "published",
+    "valid_from": "2026-06-01",
+    "valid_to": "2026-07-17",
+    "version_no": 1,
+    "superseded": true,
+    "external_shareable": true
+  },
+  {
+    "id": "term-cobalt-park-v2",
+    "building_id": "bld-cobalt",
+    "field": "supported_parking_spaces",
+    "value": 2,
+    "status": "candidate",
+    "valid_from": "2026-07-18",
+    "valid_to": null,
+    "version_no": 2,
+    "superseded": false,
+    "external_shareable": true
+  }
+]

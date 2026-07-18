@@ -1,0 +1,26 @@
+[
+  {
+    "id": "file-cobalt-plan-v1",
+    "building_id": "bld-cobalt",
+    "floor": "5F",
+    "filename": "CFC_5F_plan_v1.svg",
+    "version_no": 1,
+    "status": "published",
+    "valid_from": "2026-06-01",
+    "valid_to": "2026-07-17",
+    "superseded": true,
+    "external_shareable": true
+  },
+  {
+    "id": "file-cobalt-plan-v2",
+    "building_id": "bld-cobalt",
+    "floor": "5F",
+    "filename": "CFC_5F_plan_v2.svg",
+    "version_no": 2,
+    "status": "candidate",
+    "valid_from": "2026-07-18",
+    "valid_to": null,
+    "superseded": false,
+    "external_shareable": true
+  }
+]

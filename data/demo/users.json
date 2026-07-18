@@ -1,0 +1,26 @@
+[
+  {
+    "id": "usr-junior",
+    "email": "junior@demo.leaseflow.local",
+    "display_name": "Mina Lee",
+    "role": "data_steward"
+  },
+  {
+    "id": "usr-senior",
+    "email": "senior@demo.leaseflow.local",
+    "display_name": "Daniel Park",
+    "role": "senior_reviewer"
+  },
+  {
+    "id": "usr-manager",
+    "email": "manager@demo.leaseflow.local",
+    "display_name": "James Kim",
+    "role": "lm_manager"
+  },
+  {
+    "id": "usr-lead",
+    "email": "lead@demo.leaseflow.local",
+    "display_name": "Sora Han",
+    "role": "team_lead"
+  }
+]

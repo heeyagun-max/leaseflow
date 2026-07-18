@@ -1,0 +1,43 @@
+[
+  {
+    "id": "bld-cobalt",
+    "canonical_name": "Cobalt Finance Center",
+    "aliases": [
+      "Cobalt Center",
+      "CFC"
+    ],
+    "city": "Seoul",
+    "country_code": "KR",
+    "market": "CBD",
+    "currency": "KRW",
+    "timezone": "Asia/Seoul",
+    "area_unit": "py"
+  },
+  {
+    "id": "bld-pacific-gate",
+    "canonical_name": "Pacific Gate Tower",
+    "aliases": [
+      "Pacific Gate",
+      "PGT"
+    ],
+    "city": "Seoul",
+    "country_code": "KR",
+    "market": "CBD",
+    "currency": "KRW",
+    "timezone": "Asia/Seoul",
+    "area_unit": "py"
+  },
+  {
+    "id": "bld-teheran-link",
+    "canonical_name": "Teheran Link",
+    "aliases": [
+      "TL"
+    ],
+    "city": "Seoul",
+    "country_code": "KR",
+    "market": "GBD",
+    "currency": "KRW",
+    "timezone": "Asia/Seoul",
+    "area_unit": "py"
+  }
+]

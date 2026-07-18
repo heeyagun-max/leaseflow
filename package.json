@@ -1,0 +1,24 @@
+{
+  "name": "leaseflow-team-pilot-hackathon-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev -w @leaseflow/admin-web",
+    "dev:mobile": "npm run start -w @leaseflow/mobile",
+    "web:mobile": "npm run web -w @leaseflow/mobile",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "validate": "node scripts/validate-pack.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
