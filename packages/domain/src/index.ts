@@ -155,7 +155,14 @@ export function canPerform(role: UserRole, action: string): boolean {
   const permissions: Record<UserRole, string[]> = {
     data_steward: ["source.upload", "candidate.confirm"],
     senior_reviewer: ["candidate.review", "record.publish"],
-    lm_manager: ["package.prepare", "package.approve", "package.send", "report.approve"],
+    lm_manager: [
+      "package.prepare",
+      "package.approve",
+      "package.send",
+      "report.prepare",
+      "report.approve",
+      "report.send",
+    ],
     lm_member: ["package.prepare", "report.prepare"],
     team_lead: ["package.prepare", "report.prepare", "report.approve"],
     admin: ["*"],
@@ -890,6 +897,753 @@ export function sendOperationalPackage(
     audit: [...state.audit, operationalAudit(state, {
       event_type: "package.sent.sandbox", actor_id: actor.id, actor_role: actor.role,
       entity_id: packageId, occurred_at: occurredAt, metadata: { idempotency_key: idempotencyKey },
+    })],
+  };
+}
+
+export type WeeklyReportStatus = "draft" | "patch_pending" | "approved" | "sent" | "stale";
+
+export const WEEKLY_REPORT_INVESTIGATION_COMMANDS = [
+  "통화내용 확인해서 이번주 변동사항 업데이트 해",
+  "이메일 확인해서 이번주 변동사항 업데이트 해",
+  "협의 중인 면적 변동 있는지 확인해",
+  "협의 중인 층 변동 있는지 확인해",
+  "메일이랑 전화 확인해서 경쟁빌딩 파악해봐",
+] as const;
+
+export type WeeklyReportInvestigationCommand =
+  (typeof WEEKLY_REPORT_INVESTIGATION_COMMANDS)[number];
+
+export interface ReportSourceReference {
+  id: string;
+  source_type: string;
+  building_id: string;
+  occurred_at: string;
+  share_scope: "external_reportable";
+  summary: string;
+}
+
+export interface WeeklyReportPeriod {
+  from: string;
+  to: string;
+}
+
+export interface WeeklyReportNextAction {
+  action: string;
+  owner: string;
+  due_date: string;
+}
+
+export interface WeeklyReportSections {
+  key_issue: string;
+  changes_since_last_report: string[];
+  activity_summary: string[];
+  negotiated_area_floor_changes: string[];
+  competitor_buildings: string[];
+  blocker_and_pending_approval: string[];
+  next_actions: WeeklyReportNextAction[];
+}
+
+export interface WeeklyReportAttachment {
+  id: string;
+  building_id: string;
+  version_id: string;
+  filename: string;
+}
+
+export interface ConfiguredReportRecipients extends RecipientGroup {
+  configuration_id: string;
+}
+
+export interface WeeklyReportCover {
+  subject: string;
+  body: string;
+}
+
+export type WeeklyReportPatchOperationKind = "replace" | "append" | "remove" | "reorder";
+
+export interface WeeklyReportPatchOperation {
+  section: keyof WeeklyReportSections;
+  operation: WeeklyReportPatchOperationKind;
+  before: unknown;
+  after: unknown;
+  source_reference_ids: string[];
+}
+
+export interface WeeklyReportPatchFinding {
+  category: string;
+  finding: string;
+  source_reference_ids: string[];
+  confidence: number;
+}
+
+export interface WeeklyReportPatchCandidate {
+  id: string;
+  command: WeeklyReportInvestigationCommand;
+  target_building_ids: string[];
+  findings: WeeklyReportPatchFinding[];
+  operations: WeeklyReportPatchOperation[];
+  unresolved: Array<{ field: string; question: string }>;
+}
+
+export interface AcceptedWeeklyReportPatch {
+  candidate: WeeklyReportPatchCandidate;
+  accepted_by: string;
+  accepted_at: string;
+}
+
+export interface WeeklyReportApproval {
+  approved_by: string | null;
+  approved_at: string | null;
+}
+
+export interface WeeklyReportDelivery {
+  sent_at: string | null;
+  idempotency_key: string | null;
+}
+
+interface WeeklyReportProtectedSnapshot {
+  building_id: string;
+  reporting_period: WeeklyReportPeriod;
+  recipients: ConfiguredReportRecipients;
+  sources: ReportSourceReference[];
+  attachments: WeeklyReportAttachment[];
+  current_material_ids: string[];
+  cover: WeeklyReportCover;
+}
+
+export interface WeeklyReport {
+  id: string;
+  building_id: string;
+  reporting_period: WeeklyReportPeriod;
+  status: WeeklyReportStatus;
+  base_sections: WeeklyReportSections;
+  current_sections: WeeklyReportSections;
+  pending_candidate: WeeklyReportPatchCandidate | null;
+  accepted_patch_history: AcceptedWeeklyReportPatch[];
+  sources: ReportSourceReference[];
+  attachments: WeeklyReportAttachment[];
+  current_material_ids: string[];
+  recipients: ConfiguredReportRecipients;
+  cover: WeeklyReportCover;
+  unresolved: string[];
+  approval: WeeklyReportApproval;
+  delivery: WeeklyReportDelivery;
+  protected_snapshot: WeeklyReportProtectedSnapshot;
+}
+
+export interface WeeklyReportAuditEvent {
+  id: string;
+  event_type:
+    | "report.drafted"
+    | "report.patch_proposed"
+    | "report.patch_accepted"
+    | "report.patch_rejected"
+    | "report.approved"
+    | "report.sent.sandbox"
+    | "report.marked_stale";
+  actor_id: string;
+  actor_role: UserRole;
+  report_id: string;
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface WeeklyReportActivity {
+  id: string;
+  event_type: "report.sent.sandbox";
+  report_id: string;
+  building_id: string;
+  occurred_at: string;
+  summary: string;
+}
+
+export interface WeeklyReportState {
+  reports: WeeklyReport[];
+  activities: WeeklyReportActivity[];
+  audit: WeeklyReportAuditEvent[];
+}
+
+export interface CreateWeeklyReportDraftInput {
+  id: string;
+  building_id: string;
+  reporting_period: WeeklyReportPeriod;
+  sections: WeeklyReportSections;
+  sources: ReportSourceReference[];
+  attachments: WeeklyReportAttachment[];
+  material_version_ids: string[];
+  recipients: ConfiguredReportRecipients;
+  cover: WeeklyReportCover;
+  unresolved?: string[];
+}
+
+const WEEKLY_REPORT_SECTION_KEYS: ReadonlyArray<keyof WeeklyReportSections> = [
+  "key_issue",
+  "changes_since_last_report",
+  "activity_summary",
+  "negotiated_area_floor_changes",
+  "competitor_buildings",
+  "blocker_and_pending_approval",
+  "next_actions",
+];
+
+function cloneWeeklyReportSections(sections: WeeklyReportSections): WeeklyReportSections {
+  return {
+    key_issue: sections.key_issue,
+    changes_since_last_report: [...sections.changes_since_last_report],
+    activity_summary: [...sections.activity_summary],
+    negotiated_area_floor_changes: [...sections.negotiated_area_floor_changes],
+    competitor_buildings: [...sections.competitor_buildings],
+    blocker_and_pending_approval: [...sections.blocker_and_pending_approval],
+    next_actions: sections.next_actions.map((item) => ({ ...item })),
+  };
+}
+
+function cloneReportSource(source: ReportSourceReference): ReportSourceReference {
+  return { ...source };
+}
+
+function cloneReportRecipients(recipients: ConfiguredReportRecipients): ConfiguredReportRecipients {
+  return {
+    configuration_id: recipients.configuration_id,
+    to: recipients.to.map((recipient) => ({ ...recipient })),
+    cc: recipients.cc.map((recipient) => ({ ...recipient })),
+  };
+}
+
+function clonePatchCandidate(candidate: WeeklyReportPatchCandidate): WeeklyReportPatchCandidate {
+  return {
+    ...candidate,
+    target_building_ids: [...candidate.target_building_ids],
+    findings: candidate.findings.map((finding) => ({
+      ...finding,
+      source_reference_ids: [...finding.source_reference_ids],
+    })),
+    operations: candidate.operations.map((operation) => ({
+      ...operation,
+      before: structuredClone(operation.before),
+      after: structuredClone(operation.after),
+      source_reference_ids: [...operation.source_reference_ids],
+    })),
+    unresolved: candidate.unresolved.map((item) => ({ ...item })),
+  };
+}
+
+function cloneProtectedSnapshot(report: WeeklyReportProtectedSnapshot): WeeklyReportProtectedSnapshot {
+  return {
+    building_id: report.building_id,
+    reporting_period: { ...report.reporting_period },
+    recipients: cloneReportRecipients(report.recipients),
+    sources: report.sources.map(cloneReportSource),
+    attachments: report.attachments.map((attachment) => ({ ...attachment })),
+    current_material_ids: [...report.current_material_ids],
+    cover: { ...report.cover },
+  };
+}
+
+function reportAudit(
+  state: WeeklyReportState,
+  event: Omit<WeeklyReportAuditEvent, "id">,
+): WeeklyReportAuditEvent {
+  return { ...event, id: `report-audit-${state.audit.length + 1}` };
+}
+
+function requireWeeklyReportActor(actor: { id: string; role: UserRole }, action: string): void {
+  if (!canPerform(actor.role, action)) {
+    throw new Error(`Role ${actor.role} is not allowed to perform ${action}.`);
+  }
+}
+
+function requireLmManager(actor: { id: string; role: UserRole }, action: "report.approve" | "report.send"): void {
+  if (actor.role !== "lm_manager" || !canPerform(actor.role, action)) {
+    throw new Error(`Role ${actor.role} is not allowed to perform ${action}; LM Manager approval is required.`);
+  }
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+export function isExternalReportableSource(value: unknown): value is ReportSourceReference {
+  if (typeof value !== "object" || value === null) return false;
+  const source = value as Record<string, unknown>;
+  return isNonEmptyString(source.id)
+    && isNonEmptyString(source.source_type)
+    && isNonEmptyString(source.building_id)
+    && isNonEmptyString(source.occurred_at)
+    && source.share_scope === "external_reportable"
+    && isNonEmptyString(source.summary);
+}
+
+export function selectExternalReportableSources(
+  sources: readonly unknown[],
+  buildingId: string,
+  currentSourceIds: ReadonlySet<string>,
+): ReportSourceReference[] {
+  return sources.filter((source): source is ReportSourceReference =>
+    isExternalReportableSource(source)
+      && source.building_id === buildingId
+      && currentSourceIds.has(source.id));
+}
+
+function validateConfiguredReportRecipients(recipients: ConfiguredReportRecipients): void {
+  if (!recipients.configuration_id) {
+    throw new Error("A configured recipient group is required for a weekly report.");
+  }
+  validateLandlordRecipients({
+    to: recipients.to.map((recipient) => ({ ...recipient })),
+    cc: recipients.cc.map((recipient) => ({ ...recipient })),
+  });
+  const addresses = [...recipients.to, ...recipients.cc].map((recipient) => recipient.email);
+  if (addresses.some((address) => !address) || new Set(addresses).size !== addresses.length) {
+    throw new Error("Configured weekly-report recipients must have unique non-empty addresses.");
+  }
+}
+
+function assertCurrentReportInputs(
+  report: WeeklyReport,
+  currentMaterialIds: ReadonlySet<string>,
+  currentRecipientConfigurationId: string,
+): void {
+  if (report.recipients.configuration_id !== currentRecipientConfigurationId) {
+    throw new Error("Weekly report is stale because its recipient configuration changed.");
+  }
+  if (report.current_material_ids.some((id) => !currentMaterialIds.has(id))) {
+    throw new Error("Weekly report is stale because referenced material is no longer current.");
+  }
+}
+
+function assertReportSourceReferences(
+  report: Pick<WeeklyReport, "building_id" | "sources">,
+  sourceReferenceIds: readonly string[],
+): void {
+  if (sourceReferenceIds.length === 0) {
+    throw new Error("Every weekly-report finding and patch operation requires a source reference.");
+  }
+  const available = new Set(report.sources.map((source) => source.id));
+  for (const id of sourceReferenceIds) {
+    if (!available.has(id)) throw new Error(`Weekly-report patch references unavailable source ${id}.`);
+  }
+}
+
+function isNextAction(value: unknown): value is WeeklyReportNextAction {
+  if (typeof value !== "object" || value === null) return false;
+  const action = value as Record<string, unknown>;
+  return isNonEmptyString(action.action)
+    && isNonEmptyString(action.owner)
+    && isNonEmptyString(action.due_date);
+}
+
+function isValidSectionValue(section: keyof WeeklyReportSections, value: unknown): boolean {
+  if (section === "key_issue") return typeof value === "string";
+  if (!Array.isArray(value)) return false;
+  if (section === "next_actions") return value.every(isNextAction);
+  return value.every((item) => typeof item === "string");
+}
+
+function applyWeeklyReportOperations(
+  sections: WeeklyReportSections,
+  operations: readonly WeeklyReportPatchOperation[],
+): WeeklyReportSections {
+  const next = cloneWeeklyReportSections(sections);
+  for (const operation of operations) {
+    if (!WEEKLY_REPORT_SECTION_KEYS.includes(operation.section)) {
+      throw new Error(`Weekly-report patch cannot alter protected field ${String(operation.section)}.`);
+    }
+    if (!valuesEqual(next[operation.section], operation.before)) {
+      throw new Error(`Weekly-report patch before-value does not match section ${operation.section}.`);
+    }
+    if (!isValidSectionValue(operation.section, operation.after)) {
+      throw new Error(`Weekly-report patch has an invalid value for section ${operation.section}.`);
+    }
+    if (operation.operation === "append"
+      && (!Array.isArray(operation.before)
+        || !Array.isArray(operation.after)
+        || operation.after.length < operation.before.length)) {
+      throw new Error(`Weekly-report append operation is invalid for section ${operation.section}.`);
+    }
+    if (operation.operation === "remove"
+      && (!Array.isArray(operation.before)
+        || !Array.isArray(operation.after)
+        || operation.after.length > operation.before.length)) {
+      throw new Error(`Weekly-report remove operation is invalid for section ${operation.section}.`);
+    }
+    if (operation.operation === "reorder"
+      && (!Array.isArray(operation.before)
+        || !Array.isArray(operation.after)
+        || operation.after.length !== operation.before.length)) {
+      throw new Error(`Weekly-report reorder operation is invalid for section ${operation.section}.`);
+    }
+    Object.assign(next, { [operation.section]: structuredClone(operation.after) });
+  }
+  return next;
+}
+
+function assertPatchCandidate(report: WeeklyReport, candidate: WeeklyReportPatchCandidate): void {
+  if (!WEEKLY_REPORT_INVESTIGATION_COMMANDS.includes(candidate.command)) {
+    throw new Error("Unknown weekly-report investigation command.");
+  }
+  if (candidate.target_building_ids.length !== 1
+    || candidate.target_building_ids[0] !== report.building_id) {
+    throw new Error("Weekly-report patches must be scoped to exactly one matching building.");
+  }
+  if (candidate.findings.length === 0 || candidate.operations.length === 0) {
+    throw new Error("A weekly-report patch requires findings and scoped operations.");
+  }
+  for (const finding of candidate.findings) {
+    if (!Number.isFinite(finding.confidence) || finding.confidence < 0 || finding.confidence > 1) {
+      throw new Error("Weekly-report finding confidence must be between 0 and 1.");
+    }
+    assertReportSourceReferences(report, finding.source_reference_ids);
+  }
+  for (const operation of candidate.operations) {
+    assertReportSourceReferences(report, operation.source_reference_ids);
+  }
+  applyWeeklyReportOperations(report.current_sections, candidate.operations);
+}
+
+export function assertWeeklyReportIntegrity(report: WeeklyReport): void {
+  const protectedCurrent: WeeklyReportProtectedSnapshot = {
+    building_id: report.building_id,
+    reporting_period: report.reporting_period,
+    recipients: report.recipients,
+    sources: report.sources,
+    attachments: report.attachments,
+    current_material_ids: report.current_material_ids,
+    cover: report.cover,
+  };
+  if (!valuesEqual(protectedCurrent, report.protected_snapshot)) {
+    throw new Error("Weekly-report protected building, period, recipients, sources, attachments, material IDs, or cover were altered.");
+  }
+  if (report.status === "patch_pending" && !report.pending_candidate) {
+    throw new Error("Weekly-report patch-pending status requires a candidate.");
+  }
+  if (report.status !== "patch_pending" && report.pending_candidate) {
+    throw new Error("Weekly-report pending candidate exists outside patch-pending status.");
+  }
+  if ((report.approval.approved_by === null) !== (report.approval.approved_at === null)) {
+    throw new Error("Weekly-report approval metadata is incomplete.");
+  }
+  if ((report.delivery.sent_at === null) !== (report.delivery.idempotency_key === null)) {
+    throw new Error("Weekly-report send metadata is incomplete.");
+  }
+  if (report.status === "approved" && !report.approval.approved_by) {
+    throw new Error("Approved weekly report is missing approval metadata.");
+  }
+  if (report.status === "sent" && (!report.approval.approved_by || !report.delivery.sent_at)) {
+    throw new Error("Sent weekly report is missing approval or send metadata.");
+  }
+  if ((report.status === "draft" || report.status === "patch_pending")
+    && (report.approval.approved_by || report.delivery.sent_at)) {
+    throw new Error("Draft weekly report contains protected approval or send metadata.");
+  }
+
+  let replayed = cloneWeeklyReportSections(report.base_sections);
+  for (const accepted of report.accepted_patch_history) {
+    assertPatchCandidate({ ...report, current_sections: replayed }, accepted.candidate);
+    replayed = applyWeeklyReportOperations(replayed, accepted.candidate.operations);
+  }
+  if (!valuesEqual(replayed, report.current_sections)) {
+    throw new Error("Weekly-report current sections do not match accepted patch replay.");
+  }
+}
+
+export function createInitialWeeklyReportState(): WeeklyReportState {
+  return { reports: [], activities: [], audit: [] };
+}
+
+export function createWeeklyReportDraft(
+  state: WeeklyReportState,
+  input: CreateWeeklyReportDraftInput,
+  currentMaterialIds: ReadonlySet<string>,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  requireWeeklyReportActor(actor, "report.prepare");
+  if (state.reports.some((report) => report.id === input.id)) {
+    throw new Error(`Weekly report ${input.id} already exists.`);
+  }
+  if (state.reports.some((report) =>
+    report.building_id === input.building_id
+      && valuesEqual(report.reporting_period, input.reporting_period))) {
+    throw new Error("A weekly report already exists for this building and reporting period.");
+  }
+  if (!input.building_id || input.reporting_period.from > input.reporting_period.to) {
+    throw new Error("Weekly report requires a valid building and reporting period.");
+  }
+  validateConfiguredReportRecipients(input.recipients);
+  if (input.sources.length === 0) throw new Error("Weekly report requires external-reportable sources.");
+  const normalizedSources = selectExternalReportableSources(
+    input.sources,
+    input.building_id,
+    currentMaterialIds,
+  );
+  if (normalizedSources.length !== input.sources.length) {
+    throw new Error("Weekly report sources must be current, building-scoped, and external_reportable.");
+  }
+  if (new Set(normalizedSources.map((source) => source.id)).size !== normalizedSources.length) {
+    throw new Error("Weekly report source references must be unique.");
+  }
+  if (!WEEKLY_REPORT_SECTION_KEYS.every((section) => isValidSectionValue(section, input.sections[section]))) {
+    throw new Error("Weekly report contains invalid section content.");
+  }
+  if (input.attachments.some((attachment) =>
+    attachment.building_id !== input.building_id
+      || !attachment.id
+      || !attachment.version_id
+      || !attachment.filename)) {
+    throw new Error("Weekly report attachments must be building-scoped versioned material.");
+  }
+  if (new Set(input.attachments.map((attachment) => attachment.id)).size !== input.attachments.length) {
+    throw new Error("Weekly report attachments must be unique.");
+  }
+  const referencedMaterialIds = [...new Set([
+    ...input.material_version_ids,
+    ...input.attachments.map((attachment) => attachment.version_id),
+    ...normalizedSources.map((source) => source.id),
+  ])];
+  if (referencedMaterialIds.length === 0
+    || referencedMaterialIds.some((id) => !currentMaterialIds.has(id))) {
+    throw new Error("Weekly report may reference only current material IDs.");
+  }
+  const recipients = cloneReportRecipients(input.recipients);
+  const sources = normalizedSources.map(cloneReportSource);
+  const attachments = input.attachments.map((attachment) => ({ ...attachment }));
+  const protectedValues: WeeklyReportProtectedSnapshot = {
+    building_id: input.building_id,
+    reporting_period: { ...input.reporting_period },
+    recipients,
+    sources,
+    attachments,
+    current_material_ids: referencedMaterialIds,
+    cover: { ...input.cover },
+  };
+  const report: WeeklyReport = {
+    id: input.id,
+    ...cloneProtectedSnapshot(protectedValues),
+    status: "draft",
+    base_sections: cloneWeeklyReportSections(input.sections),
+    current_sections: cloneWeeklyReportSections(input.sections),
+    pending_candidate: null,
+    accepted_patch_history: [],
+    unresolved: [...(input.unresolved ?? [])],
+    approval: { approved_by: null, approved_at: null },
+    delivery: { sent_at: null, idempotency_key: null },
+    protected_snapshot: cloneProtectedSnapshot(protectedValues),
+  };
+  assertWeeklyReportIntegrity(report);
+  return {
+    ...state,
+    reports: [...state.reports, report],
+    audit: [...state.audit, reportAudit(state, {
+      event_type: "report.drafted",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: report.id,
+      occurred_at: occurredAt,
+      metadata: { source_count: sources.length, material_count: referencedMaterialIds.length },
+    })],
+  };
+}
+
+export function proposeWeeklyReportPatch(
+  state: WeeklyReportState,
+  reportId: string,
+  candidate: WeeklyReportPatchCandidate,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  requireWeeklyReportActor(actor, "report.prepare");
+  const target = state.reports.find((report) => report.id === reportId);
+  if (!target || target.status !== "draft") {
+    throw new Error("Only a draft weekly report can receive a patch candidate.");
+  }
+  assertWeeklyReportIntegrity(target);
+  assertPatchCandidate(target, candidate);
+  const pendingCandidate = clonePatchCandidate(candidate);
+  return {
+    ...state,
+    reports: state.reports.map((report) => report.id === reportId
+      ? { ...report, status: "patch_pending" as const, pending_candidate: pendingCandidate }
+      : report),
+    audit: [...state.audit, reportAudit(state, {
+      event_type: "report.patch_proposed",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: reportId,
+      occurred_at: occurredAt,
+      metadata: { candidate_id: candidate.id, command: candidate.command },
+    })],
+  };
+}
+
+export function decideWeeklyReportPatch(
+  state: WeeklyReportState,
+  reportId: string,
+  decision: "accept" | "reject",
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  requireWeeklyReportActor(actor, "report.prepare");
+  const target = state.reports.find((report) => report.id === reportId);
+  if (!target || target.status !== "patch_pending" || !target.pending_candidate) {
+    throw new Error("No weekly-report patch candidate is pending.");
+  }
+  assertWeeklyReportIntegrity(target);
+  if (decision === "accept" && target.pending_candidate.unresolved.length > 0) {
+    throw new Error("A weekly-report patch with unresolved findings cannot be accepted.");
+  }
+  const nextSections = decision === "accept"
+    ? applyWeeklyReportOperations(target.current_sections, target.pending_candidate.operations)
+    : cloneWeeklyReportSections(target.current_sections);
+  const acceptedPatch = decision === "accept" ? {
+    candidate: clonePatchCandidate(target.pending_candidate),
+    accepted_by: actor.id,
+    accepted_at: occurredAt,
+  } : null;
+  const nextReport: WeeklyReport = {
+    ...target,
+    status: "draft",
+    current_sections: nextSections,
+    pending_candidate: null,
+    accepted_patch_history: acceptedPatch
+      ? [...target.accepted_patch_history, acceptedPatch]
+      : [...target.accepted_patch_history],
+  };
+  assertWeeklyReportIntegrity(nextReport);
+  return {
+    ...state,
+    reports: state.reports.map((report) => report.id === reportId ? nextReport : report),
+    audit: [...state.audit, reportAudit(state, {
+      event_type: decision === "accept" ? "report.patch_accepted" : "report.patch_rejected",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: reportId,
+      occurred_at: occurredAt,
+      metadata: { candidate_id: target.pending_candidate.id },
+    })],
+  };
+}
+
+export function approveWeeklyReport(
+  state: WeeklyReportState,
+  reportId: string,
+  currentMaterialIds: ReadonlySet<string>,
+  currentRecipientConfigurationId: string,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  requireLmManager(actor, "report.approve");
+  const target = state.reports.find((report) => report.id === reportId);
+  if (!target || target.status !== "draft" || target.pending_candidate || target.unresolved.length > 0) {
+    throw new Error("Only a complete draft without pending or unresolved patches can be approved.");
+  }
+  validateConfiguredReportRecipients(target.recipients);
+  assertWeeklyReportIntegrity(target);
+  assertCurrentReportInputs(target, currentMaterialIds, currentRecipientConfigurationId);
+  const nextReport: WeeklyReport = {
+    ...target,
+    status: "approved",
+    approval: { approved_by: actor.id, approved_at: occurredAt },
+  };
+  assertWeeklyReportIntegrity(nextReport);
+  return {
+    ...state,
+    reports: state.reports.map((report) => report.id === reportId ? nextReport : report),
+    audit: [...state.audit, reportAudit(state, {
+      event_type: "report.approved",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: reportId,
+      occurred_at: occurredAt,
+      metadata: { recipient_configuration_id: currentRecipientConfigurationId },
+    })],
+  };
+}
+
+export function sendWeeklyReport(
+  state: WeeklyReportState,
+  reportId: string,
+  idempotencyKey: string,
+  currentMaterialIds: ReadonlySet<string>,
+  currentRecipientConfigurationId: string,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  requireLmManager(actor, "report.send");
+  if (!idempotencyKey) throw new Error("A weekly-report send requires an idempotency key.");
+  const reusedKey = state.reports.find((report) =>
+    report.delivery.idempotency_key === idempotencyKey && report.id !== reportId);
+  if (reusedKey) throw new Error("Idempotency key is already assigned to another weekly report.");
+  const target = state.reports.find((report) => report.id === reportId);
+  if (!target) throw new Error(`Unknown weekly report: ${reportId}.`);
+  assertWeeklyReportIntegrity(target);
+  if (target.status === "sent" && target.delivery.idempotency_key === idempotencyKey) return state;
+  if (target.status !== "approved" || target.pending_candidate || target.unresolved.length > 0) {
+    throw new Error("Weekly-report send is blocked until clean LM Manager approval.");
+  }
+  validateConfiguredReportRecipients(target.recipients);
+  assertCurrentReportInputs(target, currentMaterialIds, currentRecipientConfigurationId);
+  const nextReport: WeeklyReport = {
+    ...target,
+    status: "sent",
+    delivery: { sent_at: occurredAt, idempotency_key: idempotencyKey },
+  };
+  assertWeeklyReportIntegrity(nextReport);
+  const activity: WeeklyReportActivity = {
+    id: `report-activity-${state.activities.length + 1}`,
+    event_type: "report.sent.sandbox",
+    report_id: reportId,
+    building_id: target.building_id,
+    occurred_at: occurredAt,
+    summary: `Sandbox weekly report sent to ${target.recipients.to.map((item) => item.email).join(", ")}.`,
+  };
+  return {
+    ...state,
+    reports: state.reports.map((report) => report.id === reportId ? nextReport : report),
+    activities: [...state.activities, activity],
+    audit: [...state.audit, reportAudit(state, {
+      event_type: "report.sent.sandbox",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: reportId,
+      occurred_at: occurredAt,
+      metadata: { idempotency_key: idempotencyKey },
+    })],
+  };
+}
+
+export function markWeeklyReportStale(
+  state: WeeklyReportState,
+  reportId: string,
+  currentMaterialIds: ReadonlySet<string>,
+  currentRecipientConfigurationId: string,
+  actor: { id: string; role: UserRole },
+  occurredAt: string,
+): WeeklyReportState {
+  const target = state.reports.find((report) => report.id === reportId);
+  if (!target) throw new Error(`Unknown weekly report: ${reportId}.`);
+  assertWeeklyReportIntegrity(target);
+  if (target.status === "sent" || target.status === "stale") return state;
+  const materialDrift = target.current_material_ids.some((id) => !currentMaterialIds.has(id));
+  const recipientDrift = target.recipients.configuration_id !== currentRecipientConfigurationId;
+  if (!materialDrift && !recipientDrift) return state;
+  const nextReport: WeeklyReport = {
+    ...target,
+    status: "stale",
+    pending_candidate: null,
+  };
+  assertWeeklyReportIntegrity(nextReport);
+  return {
+    ...state,
+    reports: state.reports.map((report) => report.id === reportId ? nextReport : report),
+    audit: [...state.audit, reportAudit(state, {
+      event_type: "report.marked_stale",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      report_id: reportId,
+      occurred_at: occurredAt,
+      metadata: { material_drift: materialDrift, recipient_drift: recipientDrift },
     })],
   };
 }

@@ -1,27 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
   assertTransition,
+  assertWeeklyReportIntegrity,
   approveOperationalPackage,
+  approveWeeklyReport,
   canPerform,
   canSendExternal,
   confirmCandidates,
   confirmOperationalRequest,
   createInitialOperationalState,
+  createInitialWeeklyReportState,
+  createWeeklyReportDraft,
   decidePackageEdit,
+  decideWeeklyReportPatch,
   draftOperationalPackage,
   importOperationalRequest,
+  markWeeklyReportStale,
   publishConfirmedBatch,
   proposePackageEdit,
+  proposeWeeklyReportPatch,
   recordExtraction,
   renderOperationalPackageBody,
   selectCurrentFloorPlan,
   selectCurrentPublished,
+  selectExternalReportableSources,
   sendOperationalPackage,
+  sendWeeklyReport,
   validateLandlordRecipients,
+  WEEKLY_REPORT_INVESTIGATION_COMMANDS,
   type CandidateChange,
+  type ConfiguredReportRecipients,
+  type CreateWeeklyReportDraftInput,
   type FileVersion,
   type GovernedPublicationState,
   type VersionedRecord,
+  type WeeklyReportPatchCandidate,
+  type WeeklyReportSections,
+  type WeeklyReportState,
 } from "./index";
 
 const versions: VersionedRecord[] = [
@@ -72,6 +87,440 @@ describe("governed version selection", () => {
   it("blocks send until approval and clean records", () => {
     expect(canSendExternal({approved:true, unresolvedCount:0, facts:[versions[1]!], files:[versions[1]!]})).toBe(true);
     expect(canSendExternal({approved:false, unresolvedCount:0, facts:[versions[1]!], files:[versions[1]!]})).toBe(false);
+  });
+});
+
+describe("weekly landlord report governance", () => {
+  const manager = { id: "usr-manager", role: "lm_manager" as const };
+  const member = { id: "usr-member", role: "lm_member" as const };
+  const currentMaterialIds = new Set(["activity-1", "outlook-1", "area-v2", "plan-v2"]);
+  const recipients: ConfiguredReportRecipients = {
+    configuration_id: "recipient-config-v1",
+    to: [{ email: "am.manager@example.test", role: "to_landlord_practical" }],
+    cc: [
+      { email: "am.team@example.test", role: "cc_landlord_team" },
+      { email: "am.exec@example.test", role: "cc_landlord_exec" },
+      { email: "lm.team@example.test", role: "cc_lm_team" },
+      { email: "lm.exec@example.test", role: "cc_lm_exec" },
+    ],
+  };
+  const sections: WeeklyReportSections = {
+    key_issue: "5F marketed area and floor plan revised after partial occupancy.",
+    changes_since_last_report: ["Marketed area 300 py → 200 py"],
+    activity_summary: ["Broker requested current 5F package"],
+    negotiated_area_floor_changes: [],
+    competitor_buildings: [],
+    blocker_and_pending_approval: [],
+    next_actions: [{ action: "Confirm broker feedback", owner: "LM Manager", due_date: "2026-07-20" }],
+  };
+  const draftInput: CreateWeeklyReportDraftInput = {
+    id: "report-cobalt-2026-w29",
+    building_id: "bld-cobalt",
+    reporting_period: { from: "2026-07-13", to: "2026-07-18" },
+    sections,
+    sources: [
+      {
+        id: "activity-1",
+        source_type: "leaseflow_activity",
+        building_id: "bld-cobalt",
+        occurred_at: "2026-07-17T06:00:00.000Z",
+        share_scope: "external_reportable",
+        summary: "Current package sent to broker.",
+      },
+      {
+        id: "outlook-1",
+        source_type: "mock_outlook",
+        building_id: "bld-cobalt",
+        occurred_at: "2026-07-18T02:00:00.000Z",
+        share_scope: "external_reportable",
+        summary: "Negotiated area changed to 200 py.",
+      },
+    ],
+    attachments: [{
+      id: "attachment-plan",
+      building_id: "bld-cobalt",
+      version_id: "plan-v2",
+      filename: "CFC_5F_plan_v2.svg",
+    }],
+    material_version_ids: ["area-v2"],
+    recipients,
+    cover: {
+      subject: "[Weekly Report] Cobalt Finance Center 2026-07-13–2026-07-18",
+      body: "Please find the approved building-specific weekly report attached.",
+    },
+  };
+
+  function drafted(input: CreateWeeklyReportDraftInput = draftInput): WeeklyReportState {
+    return createWeeklyReportDraft(
+      createInitialWeeklyReportState(),
+      input,
+      currentMaterialIds,
+      member,
+      "2026-07-18T03:00:00.000Z",
+    );
+  }
+
+  function areaPatch(id = "patch-area"): WeeklyReportPatchCandidate {
+    return {
+      id,
+      command: "협의 중인 면적 변동 있는지 확인해",
+      target_building_ids: ["bld-cobalt"],
+      findings: [{
+        category: "negotiated_area",
+        finding: "Marketed area changed from 300 py to 200 py.",
+        source_reference_ids: ["outlook-1"],
+        confidence: 0.99,
+      }],
+      operations: [{
+        section: "negotiated_area_floor_changes",
+        operation: "append",
+        before: [],
+        after: ["Marketed area 300 py → 200 py"],
+        source_reference_ids: ["outlook-1"],
+      }],
+      unresolved: [],
+    };
+  }
+
+  it("defines explicit report permissions", () => {
+    expect(canPerform("lm_manager", "report.prepare")).toBe(true);
+    expect(canPerform("lm_manager", "report.approve")).toBe(true);
+    expect(canPerform("lm_manager", "report.send")).toBe(true);
+    expect(canPerform("lm_member", "report.prepare")).toBe(true);
+    expect(canPerform("lm_member", "report.approve")).toBe(false);
+    expect(canPerform("team_lead", "report.approve")).toBe(true);
+  });
+
+  it("pins all five commands and fails closed for legacy sources without share scope", () => {
+    expect(WEEKLY_REPORT_INVESTIGATION_COMMANDS).toEqual([
+      "통화내용 확인해서 이번주 변동사항 업데이트 해",
+      "이메일 확인해서 이번주 변동사항 업데이트 해",
+      "협의 중인 면적 변동 있는지 확인해",
+      "협의 중인 층 변동 있는지 확인해",
+      "메일이랑 전화 확인해서 경쟁빌딩 파악해봐",
+    ]);
+    const legacySchemaV2Activity = {
+      id: "legacy-activity",
+      source_type: "leaseflow_activity",
+      building_id: "bld-cobalt",
+      occurred_at: "2026-07-18T00:00:00.000Z",
+      summary: "Legacy row without share scope",
+    };
+    expect(selectExternalReportableSources(
+      [legacySchemaV2Activity, draftInput.sources[0]],
+      "bld-cobalt",
+      new Set(["legacy-activity", "activity-1"]),
+    ).map((source) => source.id)).toEqual(["activity-1"]);
+  });
+
+  it("creates a building-specific draft from copied configured recipients and current external sources", () => {
+    const input = structuredClone(draftInput);
+    const state = drafted(input);
+    input.recipients.to[0]!.email = "tampered@example.test";
+    input.sources[0]!.summary = "tampered";
+    input.sections.key_issue = "tampered";
+
+    expect(state.reports[0]).toMatchObject({
+      id: "report-cobalt-2026-w29",
+      building_id: "bld-cobalt",
+      status: "draft",
+      recipients: { configuration_id: "recipient-config-v1" },
+      approval: { approved_by: null, approved_at: null },
+      delivery: { sent_at: null, idempotency_key: null },
+    });
+    expect(state.reports[0]?.recipients.to[0]?.email).toBe("am.manager@example.test");
+    expect(state.reports[0]?.sources[0]?.summary).toBe("Current package sent to broker.");
+    expect(state.reports[0]?.current_sections.key_issue).toBe(sections.key_issue);
+    expect(state.audit.map((event) => event.id)).toEqual(["report-audit-1"]);
+  });
+
+  it("admits only current, external-reportable, building-scoped sources and attachments", () => {
+    expect(() => drafted({
+      ...draftInput,
+      sources: draftInput.sources.map((source, index) => index === 0
+        ? { ...source, building_id: "bld-other" }
+        : source),
+    })).toThrow(/building-scoped/);
+    expect(() => drafted({
+      ...draftInput,
+      attachments: draftInput.attachments.map((attachment) => ({
+        ...attachment,
+        building_id: "bld-other",
+      })),
+    })).toThrow(/attachments.*building-scoped/);
+    expect(() => createWeeklyReportDraft(
+      createInitialWeeklyReportState(),
+      draftInput,
+      new Set(["outlook-1", "area-v2", "plan-v2"]),
+      member,
+      "2026-07-18T03:00:00.000Z",
+    )).toThrow(/current.*external_reportable/);
+  });
+
+  it("proposes a source-backed scoped patch without mutating the report body, then replays acceptance", () => {
+    const before = drafted();
+    const originalReport = structuredClone(before.reports[0]!);
+    const proposed = proposeWeeklyReportPatch(
+      before,
+      draftInput.id,
+      areaPatch(),
+      member,
+      "2026-07-18T03:01:00.000Z",
+    );
+    expect(before.reports[0]).toEqual(originalReport);
+    expect(proposed.reports[0]?.status).toBe("patch_pending");
+    expect(proposed.reports[0]?.current_sections).toEqual(originalReport.current_sections);
+    expect(proposed.reports[0]?.pending_candidate?.id).toBe("patch-area");
+
+    const accepted = decideWeeklyReportPatch(
+      proposed,
+      draftInput.id,
+      "accept",
+      member,
+      "2026-07-18T03:02:00.000Z",
+    );
+    expect(accepted.reports[0]?.current_sections.negotiated_area_floor_changes)
+      .toEqual(["Marketed area 300 py → 200 py"]);
+    expect(accepted.reports[0]?.accepted_patch_history).toHaveLength(1);
+    expect(() => assertWeeklyReportIntegrity(accepted.reports[0]!)).not.toThrow();
+    expect(() => assertWeeklyReportIntegrity({
+      ...accepted.reports[0]!,
+      current_sections: { ...accepted.reports[0]!.current_sections, key_issue: "uncontrolled rewrite" },
+    })).toThrow(/accepted patch replay/);
+  });
+
+  it("rejects a pending patch without changing current sections or accepted history", () => {
+    const proposed = proposeWeeklyReportPatch(
+      drafted(),
+      draftInput.id,
+      areaPatch(),
+      manager,
+      "2026-07-18T03:01:00.000Z",
+    );
+    const rejected = decideWeeklyReportPatch(
+      proposed,
+      draftInput.id,
+      "reject",
+      manager,
+      "2026-07-18T03:02:00.000Z",
+    );
+    expect(rejected.reports[0]?.current_sections).toEqual(sections);
+    expect(rejected.reports[0]?.accepted_patch_history).toEqual([]);
+    expect(rejected.reports[0]?.pending_candidate).toBeNull();
+    expect(rejected.audit.at(-1)?.event_type).toBe("report.patch_rejected");
+  });
+
+  it("blocks cross-building, unbacked, unresolved, and protected-field patch attempts", () => {
+    const base = drafted();
+    expect(() => proposeWeeklyReportPatch(
+      base,
+      draftInput.id,
+      { ...areaPatch(), target_building_ids: ["bld-other"] },
+      manager,
+      "2026-07-18T03:01:00.000Z",
+    )).toThrow(/one matching building/);
+    expect(() => proposeWeeklyReportPatch(
+      base,
+      draftInput.id,
+      {
+        ...areaPatch(),
+        operations: areaPatch().operations.map((operation) => ({
+          ...operation,
+          source_reference_ids: ["internal-only-source"],
+        })),
+      },
+      manager,
+      "2026-07-18T03:01:00.000Z",
+    )).toThrow(/unavailable source/);
+    expect(() => proposeWeeklyReportPatch(
+      base,
+      draftInput.id,
+      {
+        ...areaPatch(),
+        operations: [{
+          section: "building_id" as keyof WeeklyReportSections,
+          operation: "replace",
+          before: "bld-cobalt",
+          after: "bld-other",
+          source_reference_ids: ["outlook-1"],
+        }],
+      },
+      manager,
+      "2026-07-18T03:01:00.000Z",
+    )).toThrow(/cannot alter protected field/);
+    const pendingUnresolved = proposeWeeklyReportPatch(
+      base,
+      draftInput.id,
+      { ...areaPatch(), unresolved: [{ field: "area", question: "Which area is approved?" }] },
+      manager,
+      "2026-07-18T03:01:00.000Z",
+    );
+    expect(() => decideWeeklyReportPatch(
+      pendingUnresolved,
+      draftInput.id,
+      "accept",
+      manager,
+      "2026-07-18T03:02:00.000Z",
+    )).toThrow(/unresolved/);
+    expect(() => assertWeeklyReportIntegrity({
+      ...base.reports[0]!,
+      recipients: { ...base.reports[0]!.recipients, configuration_id: "invented-config" },
+    })).toThrow(/protected building, period, recipients, sources, attachments, material IDs, or cover/);
+  });
+
+  it("requires LM Manager approval, clean state, configured recipients, integrity, and current material", () => {
+    const base = drafted();
+    expect(() => approveWeeklyReport(
+      base,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      member,
+      "2026-07-18T03:03:00.000Z",
+    )).toThrow(/LM Manager approval/);
+    expect(() => approveWeeklyReport(
+      base,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      { id: "usr-lead", role: "team_lead" },
+      "2026-07-18T03:03:00.000Z",
+    )).toThrow(/LM Manager approval/);
+    expect(() => approveWeeklyReport(
+      base,
+      draftInput.id,
+      new Set(["activity-1"]),
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    )).toThrow(/stale/);
+    expect(() => approveWeeklyReport(
+      base,
+      draftInput.id,
+      currentMaterialIds,
+      "recipient-config-v2",
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    )).toThrow(/recipient configuration changed/);
+
+    const approved = approveWeeklyReport(
+      base,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    );
+    expect(approved.reports[0]).toMatchObject({
+      status: "approved",
+      approval: { approved_by: "usr-manager", approved_at: "2026-07-18T03:03:00.000Z" },
+    });
+  });
+
+  it("sends in the sandbox exactly once and rejects a cross-report idempotency collision", () => {
+    const approved = approveWeeklyReport(
+      drafted(),
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    );
+    const sent = sendWeeklyReport(
+      approved,
+      draftInput.id,
+      "report-send-key",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:04:00.000Z",
+    );
+    expect(sent.activities).toEqual([expect.objectContaining({
+      id: "report-activity-1",
+      event_type: "report.sent.sandbox",
+      report_id: draftInput.id,
+      building_id: "bld-cobalt",
+    })]);
+    expect(sendWeeklyReport(
+      sent,
+      draftInput.id,
+      "report-send-key",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:05:00.000Z",
+    )).toBe(sent);
+
+    const secondDraft = createWeeklyReportDraft(
+      sent,
+      {
+        ...draftInput,
+        id: "report-cobalt-2026-w30",
+        reporting_period: { from: "2026-07-20", to: "2026-07-25" },
+      },
+      currentMaterialIds,
+      manager,
+      "2026-07-25T03:00:00.000Z",
+    );
+    const secondApproved = approveWeeklyReport(
+      secondDraft,
+      "report-cobalt-2026-w30",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-25T03:03:00.000Z",
+    );
+    expect(() => sendWeeklyReport(
+      secondApproved,
+      "report-cobalt-2026-w30",
+      "report-send-key",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-25T03:04:00.000Z",
+    )).toThrow(/another weekly report/);
+  });
+
+  it("marks an unsent report stale on material or recipient configuration drift", () => {
+    const approved = approveWeeklyReport(
+      drafted(),
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    );
+    expect(markWeeklyReportStale(
+      approved,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:04:00.000Z",
+    )).toBe(approved);
+    const stale = markWeeklyReportStale(
+      approved,
+      draftInput.id,
+      new Set(["activity-1", "outlook-1", "area-v3", "plan-v3"]),
+      "recipient-config-v2",
+      manager,
+      "2026-07-18T03:05:00.000Z",
+    );
+    expect(stale.reports[0]?.status).toBe("stale");
+    expect(stale.reports[0]?.approval.approved_by).toBe("usr-manager");
+    expect(stale.audit.at(-1)).toMatchObject({
+      event_type: "report.marked_stale",
+      metadata: { material_drift: true, recipient_drift: true },
+    });
+    expect(() => sendWeeklyReport(
+      stale,
+      draftInput.id,
+      "stale-send",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:06:00.000Z",
+    )).toThrow(/approval/);
   });
 });
 
