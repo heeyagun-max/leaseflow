@@ -1,0 +1,107 @@
+{
+  "goalId": "G006-stage-6-submission-evidence-and-demo",
+  "verdict": "APPROVE",
+  "architectStatus": "CLEAR",
+  "independentReview": true,
+  "reviewers": [
+    {
+      "agentPath": "/root/g006_final_code_review",
+      "role": "code-reviewer",
+      "recommendation": "APPROVE",
+      "issues": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "total": 0
+      },
+      "filesReviewed": 40
+    },
+    {
+      "agentPath": "/root/g006_final_architecture_review",
+      "role": "architect",
+      "status": "CLEAR"
+    }
+  ],
+  "evidence": [
+    {
+      "name": "unit-and-integration-tests",
+      "result": "PASS",
+      "detail": "126 tests passed"
+    },
+    {
+      "name": "workspace-typechecks",
+      "result": "PASS",
+      "detail": "Five workspace typechecks passed"
+    },
+    {
+      "name": "repository-validation",
+      "result": "PASS",
+      "detail": "npm run validate passed"
+    },
+    {
+      "name": "admin-production-build",
+      "result": "PASS",
+      "detail": "Admin production build completed with 13 routes"
+    },
+    {
+      "name": "mobile-web-export",
+      "result": "PASS",
+      "detail": "Expo web export completed"
+    },
+    {
+      "name": "responsive-qa",
+      "result": "PASS",
+      "detail": "Admin responsive checks passed at 375, 768, and 1280 pixel widths"
+    },
+    {
+      "name": "demo-video-media-probe",
+      "result": "PASS",
+      "detail": {
+        "durationSeconds": 109.145,
+        "resolution": "1920x1080",
+        "videoCodec": "avc1",
+        "audioCodec": "AAC",
+        "sizeBytes": 51723559,
+        "sha256": "5b1f85b3c0a3339b388255f10c37ccddee14e3dc6a76085800d2186629e33bcc"
+      }
+    },
+    {
+      "name": "demo-video-ocr-and-secret-scan",
+      "result": "PASS",
+      "detail": "Seven OCR frames scanned; generic secret findings: 0; synthetic markers confirmed"
+    },
+    {
+      "name": "release-exclusions-and-staged-gate",
+      "result": "PASS",
+      "detail": "Runtime state and proprietary references were excluded from the staged release; staged-content gate passed"
+    }
+  ],
+  "pendingExternalActions": [
+    {
+      "action": "Publish and record public Admin URL",
+      "claimedComplete": false
+    },
+    {
+      "action": "Publish and record public Mobile URL",
+      "claimedComplete": false
+    },
+    {
+      "action": "Publish and record public repository URL",
+      "claimedComplete": false
+    },
+    {
+      "action": "Publish and record public demo video URL",
+      "claimedComplete": false
+    },
+    {
+      "action": "Capture actual /feedback evidence",
+      "claimedComplete": false
+    },
+    {
+      "action": "Complete public upload and final submission",
+      "claimedComplete": false
+    }
+  ],
+  "generatedAt": "2026-07-19T08:14:59+09:00"
+}

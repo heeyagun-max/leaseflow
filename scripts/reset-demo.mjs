@@ -66,8 +66,6 @@ export async function resetDemo({
     }
     throw new Error(body.error ?? `Demo reset failed (HTTP ${response.status}).`);
   }
-
-  throw new Error("Demo reset did not complete.");
 }
 
 async function main() {

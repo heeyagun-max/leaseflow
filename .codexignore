@@ -4,6 +4,9 @@ node_modules/
 dist/
 coverage/
 .omx/
+.omo/**
+apps/admin-web/data/**
+docs/reference/**
 private-inputs/
 real-company-data/
 exports/

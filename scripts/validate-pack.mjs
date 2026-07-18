@@ -1,5 +1,44 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+
+const forbiddenReleasePrefixes = [
+  ".omo/",
+  "apps/admin-web/data/",
+  "docs/reference/",
+];
+
+const gitContextResult = spawnSync(
+  "git",
+  ["rev-parse", "--is-inside-work-tree"],
+  { encoding: "utf8" },
+);
+
+if (gitContextResult.status === 0 && gitContextResult.stdout.trim() === "true") {
+  const stagedResult = spawnSync(
+    "git",
+    ["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMRT"],
+    { encoding: "utf8" },
+  );
+
+  if (stagedResult.error) {
+    throw new Error(`Unable to inspect staged release paths: ${stagedResult.error.message}`);
+  }
+  if (stagedResult.status !== 0) {
+    throw new Error(`Unable to inspect staged release paths: ${stagedResult.stderr.trim()}`);
+  }
+
+  const forbiddenStagedPaths = stagedResult.stdout
+    .split("\0")
+    .filter(Boolean)
+    .map((file) => file.replaceAll("\\", "/"))
+    .filter((file) => forbiddenReleasePrefixes.some((prefix) => file.startsWith(prefix)));
+
+  if (forbiddenStagedPaths.length) {
+    console.error("Forbidden release paths are staged:", forbiddenStagedPaths);
+    process.exit(1);
+  }
+}
 
 const required = [
   "README.md",

@@ -1156,92 +1156,6 @@ select {
   }
 }
 
-@media (max-width: 62rem) {
-  .lf-product-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .lf-app-nav {
-    position: static;
-    display: grid;
-    min-block-size: auto;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: var(--lf-space-4);
-    align-items: center;
-    padding: var(--lf-space-4) var(--lf-space-5);
-  }
-
-  .lf-app-nav__brand {
-    padding-inline: 0;
-  }
-
-  .lf-app-nav__brand span span,
-  .lf-app-nav__account {
-    display: none;
-  }
-
-  .lf-app-nav__links {
-    display: flex;
-    max-inline-size: 100%;
-    gap: var(--lf-space-1);
-    justify-content: flex-end;
-    overflow-x: auto;
-    scrollbar-width: thin;
-  }
-
-  .lf-app-nav__links a {
-    display: inline-flex;
-    flex: 0 0 auto;
-    min-inline-size: max-content;
-    gap: var(--lf-space-2);
-    padding-inline: var(--lf-space-3);
-  }
-
-  .lf-app-nav__item-mark {
-    display: none;
-  }
-
-  .lf-source-sheet {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .lf-source-sheet__caption {
-    border-block-start: 1px solid var(--lf-border);
-    border-inline-start: 0;
-  }
-}
-
-@media (max-width: 40rem) {
-  .lf-app-nav {
-    inline-size: 100%;
-    grid-template-columns: minmax(0, 1fr);
-    padding-inline: var(--lf-space-4);
-  }
-
-  .lf-app-nav__links {
-    justify-content: flex-start;
-  }
-
-  .lf-operations-topbar {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .lf-operations-topbar span {
-    min-block-size: 2.75rem;
-    justify-content: flex-start;
-  }
-
-  .lf-operations-topbar span + span {
-    border-block-start: 1px solid var(--lf-border);
-    border-inline-start: 0;
-  }
-
-  .lf-source-sheet__blueprint,
-  .lf-source-sheet {
-    min-block-size: 15rem;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2461,6 +2375,15 @@ select {
 
   .lf-product-rail {
     position: static;
+  }
+
+  .lf-source-sheet {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lf-source-sheet__caption {
+    border-block-start: 1px solid var(--lf-border);
+    border-inline-start: 0;
   }
 }
 

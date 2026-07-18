@@ -6,19 +6,19 @@ Read `AGENTS.md`, `README.md`, every file under `docs/`, `packages/domain`, `pac
 
 ## Product goal
 
-Deliver one working vertical slice:
+Deliver one working vertical slice. The required verified path is a credential-free deterministic demo using synthetic data and the same Zod candidate contracts. An optional credentialed path may use the server OpenAI adapter, but do not claim or require a live external call unless it was actually run and separately evidenced.
 
 1. Admin selects the synthetic Cobalt July source update.
-2. A real GPT-5.6 server call extracts candidate changes.
+2. The server extraction step produces validated candidate changes; the verified demo uses deterministic synthetic candidates, while the optional credentialed path may call the server OpenAI adapter.
 3. Data Steward confirms the candidates.
 4. Senior Reviewer approves and publishes.
 5. The mobile app imports the synthetic call/email request.
-6. A real GPT-5.6 server call extracts the task.
+6. The request extraction step produces a validated task candidate through the deterministic demo path or the optional credentialed server adapter.
 7. Deterministic code retrieves the current published 200 py version and plan v2, while blocking 300 py / plan v1.
 8. The app drafts an external email and attachment package.
 9. LM Manager approves a sandbox send and activity is logged.
 10. Weekly report merges app activity and mock Outlook.
-11. A real GPT-5.6 call proposes a source-backed patch for one Korean command.
+11. The report step proposes a validated, source-backed patch for one Korean command through the deterministic demo path or the optional credentialed server adapter.
 12. User accepts the diff and approves the external building report.
 
 ## Architecture
@@ -41,7 +41,7 @@ Deliver one working vertical slice:
 - All external email/report sends require human approval.
 - Use synthetic data only.
 - Use `store:false` for GPT-5.6 Responses API calls.
-- Preserve the exact GPT-5.6 model identifier in environment configuration and show it in the README/demo evidence.
+- When the optional live adapter is used, read the exact available model identifier from `OPENAI_MODEL`; never guess it or present an unrun live call as README/demo evidence.
 
 ## First coding task
 

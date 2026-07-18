@@ -1,92 +1,49 @@
-# LeaseFlow Copilot — Team Pilot Direction + Hackathon MVP
+# LeaseFlow Copilot
 
-## Product in one sentence
+LeaseFlow Copilot turns incoming landlord source files into governed leasing records, current broker packages, and building-specific weekly reports. The verified hackathon path runs locally with synthetic data and no external credentials.
 
-LeaseFlow Copilot is a governed leasing-operations system that turns source updates and daily communications into approved property records, broker-ready packages, and building-specific weekly landlord reports.
+## What the demo proves
 
-## Long-term product direction
-
-### 1. Restricted Data Admin Web
-Designated users upload and review source documents, compare changes with prior versions, approve publication, and maintain the company-owned leasing data record.
-
-### 2. Mobile Operations App
-LM managers and team members receive or enter requests from calls, email, messages, and natural-language prompts; the app queries published data, selects current attachments, drafts external email, requires approval, records activity, and prepares weekly reports.
-
-### 3. Shared secure backend
-The backend owns roles, building access, source provenance, version history, publication state, file permissions, Outlook synchronization, output packages, and audit logs.
-
-## Hackathon MVP thesis
-
-The MVP proves one complete governed loop:
+Leasing teams receive flyers, perspective images, floor plans, area workbooks, contracts, calls, and email requests. A wrong version can put the wrong area or floor plan in front of a broker. LeaseFlow separates proposal from authority:
 
 ```text
-Synthetic leasing update
-→ GPT-5.6 change extraction
-→ junior confirmation
-→ senior approval and publication
-→ mobile request understanding
-→ current published data and floor-plan selection
-→ external email package
-→ human approval and sandbox send
-→ activity memory + mock Outlook
-→ weekly landlord report
-→ natural-language patch
-→ approval
+Synthetic landlord source
+→ classification and change candidates
+→ Data Steward confirmation
+→ Senior Reviewer publication
+→ current published Mobile package
+→ human approval
+→ sandbox delivery record
+→ building-specific weekly report
 ```
 
-The MVP is submitted to the **Work & Productivity** track. It is designed for later use by a small LM team, while keeping the submission safe and testable with synthetic data.
+AI may propose a classification, extraction, or patch. Deterministic code and the assigned human role decide whether it can become operational data or enter an external package. Provenance and current-version checks prevent a superseded floor plan from being reused.
 
-## Why two user surfaces
+## Product surfaces
 
-The users and risk levels are different:
+### Restricted Data Admin Web
 
-- Admin users handle raw source material and unpublished candidate facts.
-- Mobile users handle published operational data and external communication.
-- Mobile users must not silently edit or publish official source data.
+Designated users register incoming sources, review proposed classifications and changes, preserve version history, and publish approved records. The synthetic registry covers perspective renders, leasing flyers, portfolio editions, floor plans, area workbooks, and legal documents.
 
-## Hackathon implementation
+### Mobile Operations App
 
-- `apps/admin-web`: Next.js restricted-data workflow and server API
-- `apps/mobile`: Expo / React Native app with a web target for judges
-- `packages/domain`: deterministic governance and version-selection rules
-- `packages/ai`: GPT-5.6 structured extraction and patch contracts
-- `packages/demo-data`: safe synthetic fixtures
-- `supabase`: target schema and RLS design
+The operations view uses only current, published, active, authorized, and externally shareable records. It prepares a broker package, requires an LM Manager decision, records sandbox delivery activity, and creates a building-specific weekly report.
 
-## Recommended demo accounts
+Both surfaces use the same deterministic governance rules and audit trail. Mobile cannot publish or silently overwrite official property data.
 
-- `junior@demo.leaseflow.local` — Data Steward
-- `senior@demo.leaseflow.local` — Senior Reviewer
-- `manager@demo.leaseflow.local` — LM Manager
-- `lead@demo.leaseflow.local` — Team Lead
+## Verified judge path
 
-Demo mode can use a role switcher. Production authentication is explicitly out of scope for the hackathon.
-
-## Runtime AI
-
-The deployed demo must make real server-side GPT-5.6 calls for:
-
-1. source-update extraction;
-2. request extraction;
-3. weekly-report patch generation.
-
-Set the exact GPT-5.6 API model identifier available to your project in `OPENAI_MODEL`. Do not guess or hardcode an unavailable model ID. A deterministic mock mode is provided only for local development and test stability.
-
-## Credential-free local demo
-
-Prerequisites: Node.js 20+ and npm. The checked-in demo uses synthetic data and does not require an OpenAI key, Outlook, SSO, email, carrier, Supabase, or company-system credentials.
+Prerequisites: Node.js 20+ and npm.
 
 Install and validate once:
 
 ```bash
 npm ci
 npm run validate
-npm run test
+npm test
 ```
 
-Do not copy the root `.env.example` to `.env.local` for judging. The demo commands below set the authoritative local values explicitly.
-
-Terminal 1 — Admin Web and demo API:
+Start Admin Web and its demo API:
 
 ```bash
 npm run demo:admin
@@ -94,32 +51,85 @@ npm run demo:admin
 
 Open <http://localhost:3000>.
 
-Terminal 2 — Expo Web, after Terminal 1 is ready:
+In a second terminal, after Admin is ready, start Expo Web:
 
 ```bash
 npm run demo:mobile
 ```
 
-Open <http://localhost:8081>. `demo:mobile` explicitly embeds `EXPO_PUBLIC_LEASEFLOW_API_URL=http://localhost:3000` so the browser uses the Admin API.
+Open <http://localhost:8081>. The command sets `EXPO_PUBLIC_LEASEFLOW_API_URL=http://localhost:3000` for the browser bundle.
 
-Reset the synthetic workflow at any time while Admin Web is running:
+Reset the synthetic workflow while Admin is running:
 
 ```bash
 npm run demo:reset
 ```
 
-The reset command first reads the current workflow revision, then posts the revision-aware reset. See [Judge Test Instructions](docs/JUDGE_TEST_INSTRUCTIONS.md) and [Local Demo and Deployment](docs/LOCAL_DEMO_AND_DEPLOYMENT.md).
+The reset command reads the current revision before posting a revision-aware reset. Do not create a root `.env.local` for this judge path; the demo scripts set the required local values explicitly.
 
-## Deployment status
+Follow [Judge Test Instructions](docs/JUDGE_TEST_INSTRUCTIONS.md) for the exact click path and [Local Demo and Deployment](docs/LOCAL_DEMO_AND_DEPLOYMENT.md) for runtime limitations.
 
-Portable two-surface container configuration is provided in `compose.demo.yaml` and `deploy/`. Public Admin and Mobile URLs are pending deployment; none are claimed in this repository.
+## AI and Codex boundary
 
-## Submission evidence
+The verified judge path is deterministic, credential-free, and synthetic. It exercises the same candidate and Zod validation contracts without making an external model call.
 
-- working web-accessible admin experience;
-- web-accessible mobile app or Expo web build;
-- sample data and reset path;
-- README explanation of Codex and GPT-5.6 roles;
-- meaningful event-period commits;
-- `/feedback` Codex Session ID;
-- narrated YouTube demo under three minutes.
+`packages/ai` also contains a server-only OpenAI Responses API adapter for source extraction, request extraction, and weekly-report patch proposals. It is designed to read the GPT-5.6 model identifier available to the project from `OPENAI_MODEL`, rather than hardcoding one. The adapter reads `OPENAI_API_KEY` only on the server and sends `store: false`. No live external GPT call was run in the final verification environment because credentials were not provided; the submission must not imply otherwise.
+
+Codex was used to implement and verify the monorepo, domain controls, Admin and Mobile experiences, synthetic fixtures, API adapters, tests, local launch path, and submission documentation. The primary recorded Codex session ID is `019f7335-4b59-7e81-8131-b31800757887`; see [Codex Session Evidence](docs/CODEX_SESSION_EVIDENCE.md).
+
+## Repository map
+
+- `apps/admin-web` — Next.js Admin, reporting UI, and demo API
+- `apps/mobile` — Expo / React Native operations app with a web target
+- `packages/domain` — deterministic roles, publication, version, authorization, and send gates
+- `packages/ai` — Zod contracts, deterministic demo candidates, and optional server OpenAI adapter
+- `packages/demo-data` — synthetic fixtures and reset seed
+- `scripts` — repository validation and revision-aware reset
+- `deploy` and `compose.demo.yaml` — provider-neutral container configuration
+- `docs` — judge instructions, architecture, submission copy, and evidence
+
+## Demo roles
+
+- `junior@demo.leaseflow.local` — Data Steward / 데이터 담당자
+- `senior@demo.leaseflow.local` — Senior Reviewer / 선임 검토자
+- `manager@demo.leaseflow.local` — LM Manager / 임대 관리 책임자
+- `lead@demo.leaseflow.local` — Team Lead
+
+The role switcher is a demo control. Production authentication, SSO, and account provisioning are outside the hackathon scope.
+
+## Verification snapshot
+
+Current local verification on 2026-07-19, after milestone commit `b7f7e90`:
+
+- 126 tests passed: reset CLI 2, Admin 57, Mobile 10, AI 9, Demo Data 11, Domain 37;
+- all five npm workspaces passed strict TypeScript checks;
+- repository validation passed;
+- the 13-route Admin production build passed;
+- Expo Web export passed; earlier iOS and Android exports also passed;
+- production HTTP, revision-aware reset, CORS, and real-browser QA passed;
+- the final cleanup QA checked Admin at 375, 768, and 1280 px with no horizontal overflow or browser-console errors; the Stage 5 Admin and Mobile pass covered 320, 375, 768, and 1280 px;
+- the local Korean demo video is 109.145 seconds, 1920×1080 avc1/H.264 + AAC, 51,723,559 bytes, with SHA-256 `5b1f85b3c0a3339b388255f10c37ccddee14e3dc6a76085800d2186629e33bcc`; automated seven-frame OCR confirmed synthetic markers and zero generic secret-pattern matches, and manual 5/30/60/90-second sample checks passed. No reproducible local sensitive-identifier list was configured; the verifier supports an optional out-of-repository blocked-term file.
+
+See [Implementation Status](IMPLEMENTATION_STATUS.md) for milestone evidence.
+
+The reproducible local video is [LeaseFlow_Hackathon_Demo_KO.mp4](artifacts/submission/LeaseFlow_Hackathon_Demo_KO.mp4). Its [verification report](artifacts/submission/VIDEO_VERIFICATION_REPORT.md) records media and content checks. The MP4 is intentionally included in the local git submission package, but the package has not been pushed and the video has not been publicly hosted or uploaded.
+
+## Explicit limitations
+
+- All runtime fixtures and demo actions are synthetic.
+- “Send” stores an idempotent sandbox delivery record; it does not send email.
+- There is no production Outlook, Microsoft Graph, SSO, carrier-call, Supabase, document-repository, or company-system integration.
+- Admin uses a single-process writable JSON demo store, not a multi-instance production datastore.
+- Container files are configuration-reviewed, but were not executed in the current environment because Docker was unavailable.
+- The release boundary ignores `.omo`, `apps/admin-web/data`, and `docs/reference`; repository validation rejects forbidden staged paths.
+- No public deployment URL or public video URL is claimed yet. The narrated MP4 is complete locally but has not been uploaded.
+
+## Submission fields
+
+- Admin URL: `[PENDING: public judge URL]`
+- Mobile Web URL: `[PENDING: public judge URL]`
+- Repository URL: `[PENDING: public or judge-accessible repository URL]`
+- Demo video URL: `[PENDING: public narrated video URL, 3:00 maximum]`
+- Primary Codex session ID: `019f7335-4b59-7e81-8131-b31800757887`
+
+Submission drafts and remaining owner actions are tracked in [Devpost Copy](docs/DEVPOST_COPY.md) and the [Submission Checklist](docs/SUBMISSION_CHECKLIST.md).

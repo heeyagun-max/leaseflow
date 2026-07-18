@@ -8,9 +8,14 @@ coverage/
 *.log
 .DS_Store
 .omx/
+.omo/**
+apps/admin-web/data/**
+docs/reference/**
 data/demo/.runtime/
 *.tsbuildinfo
 .codegraph
 private-inputs/
 real-company-data/
 exports/
+artifacts/submission/LeaseFlow_Demo_Narration_KO.aiff
+artifacts/submission/LeaseFlow_Demo_Narration_KO.txt

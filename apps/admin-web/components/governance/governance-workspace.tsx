@@ -108,6 +108,12 @@ function formatRole(role: string) {
   return labels[role] ?? "담당자";
 }
 
+function statusBadgeTone(status: string): "info" | "neutral" | "success" {
+  if (status === "published") return "success";
+  if (status === "superseded") return "neutral";
+  return "info";
+}
+
 function friendlyWorkflowError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (/role|allowed|permission|forbidden/i.test(message)) {
@@ -414,7 +420,7 @@ export function GovernanceWorkspace() {
                         <h3>{asset.observed_filenames[0]}</h3>
                         {asset.observed_filenames.length > 1 ? <small>확인된 다른 파일명 {asset.observed_filenames.length - 1}개</small> : null}
                       </div>
-                      <StatusBadge tone={asset.status === "published" ? "success" : asset.status === "superseded" ? "neutral" : "info"}>
+                      <StatusBadge tone={statusBadgeTone(asset.status)}>
                         {assetStatusLabels[asset.status]}
                       </StatusBadge>
                     </div>
@@ -479,7 +485,7 @@ export function GovernanceWorkspace() {
                             <span>버전 {record.version_no}</span>
                           </td>
                           <td data-label="항목">{fieldLabels[record.field]}</td>
-                          <td data-label="상태"><StatusBadge tone={record.status === "published" ? "success" : record.status === "superseded" ? "neutral" : "info"}>{recordStatusLabels[record.status as keyof typeof recordStatusLabels] ?? "확인 필요"}</StatusBadge></td>
+                          <td data-label="상태"><StatusBadge tone={statusBadgeTone(record.status)}>{recordStatusLabels[record.status as keyof typeof recordStatusLabels] ?? "확인 필요"}</StatusBadge></td>
                           <td data-label="사용 기간">{record.valid_from} → {record.valid_to ?? "현재"}</td>
                         </tr>
                       ))}</tbody>
@@ -494,7 +500,7 @@ export function GovernanceWorkspace() {
                         <div>
                           <strong>{file.filename}</strong>
                         </div>
-                        <StatusBadge tone={file.status === "published" ? "success" : file.status === "superseded" ? "neutral" : "info"}>{recordStatusLabels[file.status as keyof typeof recordStatusLabels] ?? "확인 필요"}</StatusBadge>
+                        <StatusBadge tone={statusBadgeTone(file.status)}>{recordStatusLabels[file.status as keyof typeof recordStatusLabels] ?? "확인 필요"}</StatusBadge>
                         <span>버전 {file.version_no} · {file.valid_from} → {file.valid_to ?? "현재"}</span>
                       </article>
                     ))}
