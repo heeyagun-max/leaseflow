@@ -22,6 +22,7 @@ import {
   motion,
   radius,
   space,
+  surfaceDepth,
   tabularNumbers,
   tracking,
   type,
@@ -51,9 +52,7 @@ export function GovernanceSurface({
       accessibilityLabel={accessibilityLabel}
       style={[styles.surfaceTray, accent && styles.surfaceTrayAccent, subtle && styles.surfaceTraySubtle, increasedContrast && styles.surfaceTrayHighContrast, style]}
     >
-      <View style={[styles.surfaceCore, accent && styles.surfaceCoreAccent, subtle && styles.surfaceCoreSubtle, increasedContrast && styles.surfaceCoreHighContrast]}>
-        {children}
-      </View>
+      {children}
     </View>
   );
 }
@@ -109,16 +108,10 @@ export function ActionButton({
         webPointer,
       ]}
     >
-      {loading ? <ActivityIndicator color={variant === "primary" ? colors.canvas : colors.emerald200} /> : null}
+      {loading ? <ActivityIndicator color={variant === "primary" ? colors.canvas : colors.info} /> : null}
       <Text style={[styles.buttonLabel, styles[`buttonLabel_${variant}`], unavailable && styles.buttonLabelDisabled]}>
         {loading ? `${label} 처리 중` : label}
       </Text>
-      {variant === "primary" && !loading ? (
-        <View style={styles.buttonGlyph} accessibilityElementsHidden>
-          <View style={styles.buttonGlyphLine} />
-          <View style={[styles.buttonGlyphLine, styles.buttonGlyphLineOffset]} />
-        </View>
-      ) : null}
     </Pressable>
   );
 }
@@ -206,7 +199,7 @@ export function WorkflowRail({ steps, compact = false }: {
         >
           <View style={[styles.workflowIndex, styles[`workflowIndex_${step.state}`], increasedContrast && styles.workflowIndexHighContrast]}>
             <Text style={[styles.workflowIndexText, step.state === "complete" && styles.workflowIndexTextComplete, increasedContrast && styles.workflowIndexTextHighContrast]}>
-              {step.state === "complete" ? "✓" : index + 1}
+              {index + 1}
             </Text>
           </View>
           <View style={styles.workflowCopy}>
@@ -284,27 +277,26 @@ function useIncreasedContrast(): boolean {
   const [increasedContrast, setIncreasedContrast] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === "web") return undefined;
     let mounted = true;
-    const subscription = Platform.OS === "web"
-      ? null
-      : AccessibilityInfo.addEventListener("highTextContrastChanged", setIncreasedContrast);
-    if (Platform.OS !== "web") {
-      void AccessibilityInfo.isHighTextContrastEnabled().then((enabled) => {
-        if (mounted) setIncreasedContrast(enabled);
-      });
-    }
-    const contrastQuery = typeof window === "undefined"
-      ? null
-      : window.matchMedia("(prefers-contrast: more)");
-    const handleContrastChange = (event: MediaQueryListEvent) => setIncreasedContrast(event.matches);
-    if (contrastQuery) {
-      setIncreasedContrast(contrastQuery.matches);
-      contrastQuery.addEventListener("change", handleContrastChange);
-    }
+    const subscription = AccessibilityInfo.addEventListener("highTextContrastChanged", setIncreasedContrast);
+    void AccessibilityInfo.isHighTextContrastEnabled().then((enabled) => {
+      if (mounted) setIncreasedContrast(enabled);
+    });
     return () => {
       mounted = false;
-      subscription?.remove();
-      contrastQuery?.removeEventListener("change", handleContrastChange);
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const contrastQuery = window.matchMedia("(prefers-contrast: more)");
+    const handleContrastChange = (event: MediaQueryListEvent) => setIncreasedContrast(event.matches);
+    setIncreasedContrast(contrastQuery.matches);
+    contrastQuery.addEventListener("change", handleContrastChange);
+    return () => {
+      contrastQuery.removeEventListener("change", handleContrastChange);
     };
   }, []);
 
@@ -313,30 +305,18 @@ function useIncreasedContrast(): boolean {
 
 const styles = StyleSheet.create({
   surfaceTray: {
-    backgroundColor: colors.surface0,
-    borderColor: colors.borderSubtle,
-    borderRadius: radius.tray,
-    borderWidth: control.border,
-    maxWidth: "100%",
-    minWidth: 0,
-    padding: space.hairline,
-  },
-  surfaceTrayAccent: { borderColor: colors.accentBorder },
-  surfaceTraySubtle: { backgroundColor: colors.canvasDeep },
-  surfaceTrayHighContrast: { borderColor: colors.text2 },
-  surfaceCore: {
     backgroundColor: colors.surface1,
     borderColor: colors.border,
     borderRadius: radius.inner,
-    borderTopColor: colors.rimLight,
     borderWidth: control.border,
     maxWidth: "100%",
     minWidth: 0,
-    padding: space.group,
+    padding: space.panel,
+    ...surfaceDepth,
   },
-  surfaceCoreAccent: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
-  surfaceCoreSubtle: { backgroundColor: colors.surface0, borderColor: colors.borderSubtle },
-  surfaceCoreHighContrast: { borderColor: colors.text3 },
+  surfaceTrayAccent: { borderColor: colors.accentBorder },
+  surfaceTraySubtle: { backgroundColor: colors.surface2, borderColor: colors.borderSubtle },
+  surfaceTrayHighContrast: { borderColor: colors.text2 },
   button: {
     alignItems: "center",
     alignSelf: "flex-start",
@@ -351,33 +331,23 @@ const styles = StyleSheet.create({
     paddingVertical: space.compact,
   },
   buttonCompact: { minHeight: control.touch, paddingVertical: space.tight },
-  button_primary: { backgroundColor: colors.emerald300, borderColor: colors.emerald300, borderRadius: radius.pill },
-  button_secondary: { backgroundColor: colors.surface2, borderColor: colors.border },
-  button_ghost: { backgroundColor: colors.surface0, borderColor: colors.borderSubtle },
+  button_primary: { backgroundColor: colors.emerald500, borderColor: colors.emerald500 },
+  button_secondary: { backgroundColor: colors.surface1, borderColor: colors.border },
+  button_ghost: { backgroundColor: colors.surface2, borderColor: colors.borderSubtle },
   button_danger: { backgroundColor: colors.errorWash, borderColor: colors.error },
   buttonHovered: { borderColor: colors.borderStrong },
   buttonHoveredMotion: { transform: [{ translateY: motion.hoverLift }] },
-  buttonFocused: { borderColor: colors.emerald200, outlineColor: colors.emerald200, outlineOffset: control.focusOffset, outlineStyle: "solid", outlineWidth: control.focusOutline },
+  buttonFocused: { borderColor: colors.emerald500, outlineColor: colors.emerald500, outlineOffset: control.focusOffset, outlineStyle: "solid", outlineWidth: control.focusOutline },
   buttonHighContrast: { borderColor: colors.text2 },
   buttonPressedFeedback: { borderColor: colors.emerald200 },
   buttonPressedMotion: { transform: [{ scale: motion.pressScale }] },
   buttonDisabled: { backgroundColor: colors.surfaceDisabled, borderColor: colors.borderSubtle },
   buttonLabel: { flexShrink: 1, fontFamily: fonts.body, fontSize: type.bodySmall, fontWeight: "500", lineHeight: lineHeight.control },
-  buttonLabel_primary: { color: colors.canvas },
+  buttonLabel_primary: { color: colors.surface1, fontWeight: "600" },
   buttonLabel_secondary: { color: colors.text1 },
   buttonLabel_ghost: { color: colors.text2 },
   buttonLabel_danger: { color: colors.error },
   buttonLabelDisabled: { color: colors.textDisabled },
-  buttonGlyph: {
-    alignItems: "center",
-    backgroundColor: colors.emerald700,
-    borderRadius: radius.pill,
-    height: icon.glyph,
-    justifyContent: "center",
-    width: icon.glyph,
-  },
-  buttonGlyphLine: { backgroundColor: colors.emerald100, height: control.border, width: icon.glyphLine },
-  buttonGlyphLineOffset: { marginTop: space.hairline, width: icon.glyphLineShort },
   badge: {
     alignItems: "center",
     alignSelf: "flex-start",
@@ -390,10 +360,10 @@ const styles = StyleSheet.create({
     paddingVertical: space.hairline,
   },
   badge_neutral: { backgroundColor: colors.surface2, borderColor: colors.border },
-  badge_info: { backgroundColor: colors.infoWash, borderColor: colors.info },
-  badge_warning: { backgroundColor: colors.warningWash, borderColor: colors.warning },
-  badge_success: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
-  badge_error: { backgroundColor: colors.errorWash, borderColor: colors.error },
+  badge_info: { backgroundColor: colors.infoWash, borderColor: colors.borderSubtle },
+  badge_warning: { backgroundColor: colors.warningWash, borderColor: colors.borderSubtle },
+  badge_success: { backgroundColor: colors.accentWash, borderColor: colors.borderSubtle },
+  badge_error: { backgroundColor: colors.errorWash, borderColor: colors.borderSubtle },
   badgeHighContrast: { borderColor: colors.text2 },
   badgeDot: { borderRadius: radius.pill, height: icon.statusDot, width: icon.statusDot },
   badgeDot_neutral: { backgroundColor: colors.text3 },
@@ -410,43 +380,43 @@ const styles = StyleSheet.create({
   sectionHeading: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", gap: space.control, justifyContent: "space-between" },
   sectionHeadingCopy: { flexGrow: 1, flexShrink: 1, maxWidth: "100%", minWidth: 0 },
   sectionAction: { alignItems: "flex-end" },
-  eyebrow: { color: colors.emerald400, fontFamily: fonts.mono, fontSize: type.label, fontWeight: "600", letterSpacing: tracking.eyebrow, marginBottom: space.tight },
-  eyebrowHighContrast: { color: colors.emerald200 },
-  sectionTitle: { color: colors.text1, fontFamily: fonts.body, fontSize: type.h2, fontWeight: "400", letterSpacing: tracking.h2, lineHeight: lineHeight.h2 },
+  eyebrow: { color: colors.text3, fontFamily: fonts.body, fontSize: type.label, fontWeight: "600", letterSpacing: 0, marginBottom: space.tight },
+  eyebrowHighContrast: { color: colors.text1 },
+  sectionTitle: { color: colors.text1, fontFamily: fonts.body, fontSize: type.h2, fontWeight: "600", letterSpacing: tracking.h2, lineHeight: lineHeight.h2 },
   sectionDescription: { color: colors.text2, fontFamily: fonts.body, fontSize: type.bodySmall, lineHeight: lineHeight.bodySmall, marginTop: space.tight, maxWidth: layout.copyMax },
   secondaryTextHighContrast: { color: colors.text1 },
-  metric: { backgroundColor: colors.surface0, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.metricFloor, flexGrow: 1, maxWidth: "100%", minWidth: 0, padding: space.control },
-  metric_success: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
+  metric: { backgroundColor: colors.surface1, borderColor: colors.border, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.metricFloor, flexGrow: 1, maxWidth: "100%", minWidth: 0, padding: space.control },
+  metric_success: { backgroundColor: colors.surface1, borderColor: colors.border },
   metric_warning: { backgroundColor: colors.warningWash, borderColor: colors.warning },
   metric_info: { backgroundColor: colors.infoWash, borderColor: colors.info },
   metric_error: { backgroundColor: colors.errorWash, borderColor: colors.error },
   metricHighContrast: { borderColor: colors.text2 },
-  metricValue: { color: colors.text1, fontFamily: fonts.body, fontSize: type.h2, fontWeight: "400", lineHeight: lineHeight.h2, ...tabularNumbers },
-  metricValue_success: { color: colors.emerald200 },
+  metricValue: { color: colors.text1, fontFamily: fonts.body, fontSize: type.h2, fontWeight: "600", lineHeight: lineHeight.h2, ...tabularNumbers },
+  metricValue_success: { color: colors.success },
   metricValue_warning: { color: colors.warning },
   metricValue_info: { color: colors.info },
   metricValue_error: { color: colors.error },
   metricLabel: { color: colors.text3, fontFamily: fonts.body, fontSize: type.label, lineHeight: lineHeight.label, marginTop: space.hairline },
   metricLabelHighContrast: { color: colors.text1 },
-  dataRow: { backgroundColor: colors.surface0, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.dataFloor, flexGrow: 1, maxWidth: "100%", minWidth: 0, padding: space.compact },
-  dataRowVerified: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
+  dataRow: { backgroundColor: colors.surface2, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.dataFloor, flexGrow: 1, maxWidth: "100%", minWidth: 0, padding: space.compact },
+  dataRowVerified: { backgroundColor: colors.surface1, borderColor: colors.border },
   dataRowCandidate: { backgroundColor: colors.infoWash, borderColor: colors.info },
   dataRowHighContrast: { borderColor: colors.text2 },
-  dataLabel: { color: colors.text3, fontFamily: fonts.mono, fontSize: type.label, letterSpacing: tracking.mono, marginBottom: space.hairline },
-  dataLabelHighContrast: { color: colors.emerald200 },
-  dataValue: { color: colors.text1, fontFamily: fonts.body, fontSize: type.bodySmall, lineHeight: lineHeight.compact },
-  dataDetail: { color: colors.text3, fontFamily: fonts.mono, fontSize: type.data, lineHeight: lineHeight.data, marginTop: space.hairline },
+  dataLabel: { color: colors.text3, fontFamily: fonts.body, fontSize: type.label, fontWeight: "600", letterSpacing: 0, marginBottom: space.hairline },
+  dataLabelHighContrast: { color: colors.text1 },
+  dataValue: { color: colors.text1, flexShrink: 1, fontFamily: fonts.body, fontSize: type.bodySmall, fontWeight: "500", lineHeight: lineHeight.compact, maxWidth: "100%" },
+  dataDetail: { color: colors.text3, flexShrink: 1, fontFamily: fonts.body, fontSize: type.data, lineHeight: lineHeight.data, marginTop: space.hairline, maxWidth: "100%" },
   workflowRail: { flexDirection: "row", flexWrap: "wrap", gap: space.tight },
   workflowRailCompact: { gap: space.hairline },
-  workflowStep: { alignItems: "center", backgroundColor: colors.surface0, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.workflowFloor, flexGrow: 1, flexDirection: "row", gap: space.compact, maxWidth: "100%", minHeight: control.compactRow, minWidth: 0, padding: space.compact },
-  workflowStepCurrent: { borderColor: colors.accentBorder },
+  workflowStep: { alignItems: "center", backgroundColor: colors.surface2, borderColor: colors.borderSubtle, borderRadius: radius.medium, borderWidth: control.border, flexBasis: layout.workflowFloor, flexGrow: 1, flexDirection: "row", gap: space.compact, maxWidth: "100%", minHeight: control.compactRow, minWidth: 0, padding: space.compact },
+  workflowStepCurrent: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
   workflowStepHighContrast: { borderColor: colors.text2 },
   workflowIndex: { alignItems: "center", borderColor: colors.borderStrong, borderRadius: radius.pill, borderWidth: control.border, height: icon.railIndex, justifyContent: "center", width: icon.railIndex },
   workflowIndex_pending: { backgroundColor: colors.surface2 },
   workflowIndex_current: { backgroundColor: colors.infoWash, borderColor: colors.info },
   workflowIndex_complete: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
   workflowIndex_blocked: { backgroundColor: colors.errorWash, borderColor: colors.error },
-  workflowIndexText: { color: colors.text2, fontFamily: fonts.mono, fontSize: type.data, fontWeight: "500" },
+  workflowIndexText: { color: colors.text2, fontFamily: fonts.body, fontSize: type.data, fontWeight: "600" },
   workflowIndexTextComplete: { color: colors.success },
   workflowIndexHighContrast: { borderColor: colors.text1 },
   workflowIndexTextHighContrast: { color: colors.text1 },
@@ -460,10 +430,10 @@ const styles = StyleSheet.create({
   workflowState_blocked: { color: colors.error },
   workflowStateHighContrast: { color: colors.text1 },
   feedback: { alignItems: "flex-start", borderRadius: radius.medium, borderWidth: control.border, flexDirection: "row", flexWrap: "wrap", gap: space.compact, maxWidth: "100%", minWidth: 0, padding: space.control },
-  feedback_info: { backgroundColor: colors.infoWash, borderColor: colors.info },
-  feedback_warning: { backgroundColor: colors.warningWash, borderColor: colors.warning },
-  feedback_success: { backgroundColor: colors.accentWash, borderColor: colors.accentBorder },
-  feedback_error: { backgroundColor: colors.errorWash, borderColor: colors.error },
+  feedback_info: { backgroundColor: colors.infoWash, borderColor: colors.borderSubtle },
+  feedback_warning: { backgroundColor: colors.warningWash, borderColor: colors.borderSubtle },
+  feedback_success: { backgroundColor: colors.accentWash, borderColor: colors.borderSubtle },
+  feedback_error: { backgroundColor: colors.errorWash, borderColor: colors.borderSubtle },
   feedbackHighContrast: { borderColor: colors.text2 },
   feedbackMark: { borderRadius: radius.pill, height: icon.feedbackMark, marginTop: space.hairline, width: icon.feedbackMark },
   feedbackMark_info: { backgroundColor: colors.info },
@@ -474,7 +444,7 @@ const styles = StyleSheet.create({
   feedbackTitle: { color: colors.text1, fontFamily: fonts.body, fontSize: type.bodySmall, fontWeight: "500", lineHeight: lineHeight.control },
   feedbackDescription: { color: colors.text2, fontFamily: fonts.body, fontSize: type.bodySmall, lineHeight: lineHeight.compact, marginTop: space.hairline },
   feedbackAction: { width: "100%" },
-  mono: { color: colors.text3, fontFamily: fonts.mono, fontSize: type.data, lineHeight: lineHeight.data, ...tabularNumbers },
+  mono: { color: colors.text3, fontFamily: fonts.body, fontSize: type.data, lineHeight: lineHeight.data, ...tabularNumbers },
   divider: { backgroundColor: colors.borderSubtle, height: control.border, marginVertical: space.group, width: "100%" },
   dividerHighContrast: { backgroundColor: colors.text2 },
 });

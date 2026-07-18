@@ -26,8 +26,44 @@ const INVESTIGATION_COMMANDS = [
   "메일이랑 전화 확인해서 경쟁빌딩 파악해봐",
 ] as const;
 
+const investigationCommandLabels: Record<(typeof INVESTIGATION_COMMANDS)[number], string> = {
+  "통화내용 확인해서 이번주 변동사항 업데이트 해": "이번 주 통화 변동 확인",
+  "이메일 확인해서 이번주 변동사항 업데이트 해": "이번 주 이메일 변동 확인",
+  "협의 중인 면적 변동 있는지 확인해": "협의 면적 변동 확인",
+  "협의 중인 층 변동 있는지 확인해": "협의 층 변동 확인",
+  "메일이랑 전화 확인해서 경쟁빌딩 파악해봐": "경쟁 빌딩 언급 확인",
+};
+
+const recipientRoleLabels: Record<string, string> = {
+  asset_manager: "자산 관리",
+  leasing_manager: "임대 관리",
+  landlord: "소유주",
+  property_manager: "시설 관리",
+  to_landlord_practical: "소유주 실무 담당",
+  cc_landlord_team: "소유주 팀",
+  cc_landlord_exec: "소유주 책임자",
+  cc_lm_team: "임대 관리팀",
+  cc_lm_exec: "임대 관리 책임자",
+};
+
 type InvestigationCommand = (typeof INVESTIGATION_COMMANDS)[number];
 type ReportStatus = ReportLifecycleStatus;
+
+function investigationCommandLabel(command: string) {
+  return investigationCommandLabels[command as InvestigationCommand] ?? "선택한 변동 확인";
+}
+
+function recipientRoleLabel(role: string) {
+  return recipientRoleLabels[role] ?? "업무 담당자";
+}
+
+function friendlyReportSentence(value: string) {
+  const sentences: Record<string, string> = {
+    "No source-backed competitor building was identified.": "확인한 자료에서 경쟁 빌딩 언급을 찾지 못했습니다.",
+    "No external-reportable competitor evidence is available.": "현재 확인 가능한 자료에 경쟁 빌딩 언급이 없습니다.",
+  };
+  return sentences[value] ?? value;
+}
 
 interface ReportSections {
   key_issue: string;
@@ -87,28 +123,42 @@ type ReportAction = "approve" | "draft" | "send" | `investigate:${InvestigationC
 type Notice = { message: string; severity: "error" | "success" };
 
 const sectionLabels: Record<keyof ReportSections, string> = {
-  key_issue: "Key issue",
-  changes_since_last_report: "Changes since last report",
-  activity_summary: "Inquiry / proposal / viewing activity",
-  negotiated_area_floor_changes: "Negotiated area and floor changes",
-  competitor_buildings: "Competitor buildings",
-  blocker_and_pending_approval: "Blocker and pending approval",
-  next_actions: "Next actions",
+  key_issue: "핵심 이슈",
+  changes_since_last_report: "지난 보고 이후 변경 사항",
+  activity_summary: "문의·제안·방문 현황",
+  negotiated_area_floor_changes: "협의 중인 면적·층 변경",
+  competitor_buildings: "경쟁 빌딩",
+  blocker_and_pending_approval: "확인 및 승인 필요 사항",
+  next_actions: "다음 업무",
+};
+
+const reportStatusLabels: Record<ReportStatus, string> = {
+  draft: "작성 중",
+  patch_pending: "변경안 검토 중",
+  approved: "승인 완료",
+  sent: "전달 완료",
+  stale: "다시 작성 필요",
+};
+
+const sourceTypeLabels: Record<string, string> = {
+  activity: "업무 기록",
+  call_fixture: "통화 메모",
+  email_fixture: "이메일 자료",
 };
 
 function stringifyDiffValue(value: unknown) {
   if (Array.isArray(value)) {
-    if (value.length === 0) return "No entries";
+    if (value.length === 0) return "내용 없음";
     return value.map((item) => {
       if (typeof item === "object" && item !== null) {
         const action = item as { action?: unknown; owner?: unknown; due_date?: unknown };
-        if (action.action) return `${String(action.action)} · ${String(action.owner ?? "Unassigned")} · ${String(action.due_date ?? "No due date")}`;
+        if (action.action) return `${String(action.action)} · ${String(action.owner ?? "담당자 미정")} · ${String(action.due_date ?? "기한 미정")}`;
       }
       return String(item);
     }).join("\n");
   }
   if (typeof value === "object" && value !== null) return JSON.stringify(value, null, 2);
-  return String(value ?? "No value");
+  return String(value ?? "내용 없음");
 }
 
 function statusTone(status: ReportStatus) {
@@ -118,16 +168,27 @@ function statusTone(status: ReportStatus) {
   return "info" as const;
 }
 
+function friendlyReportError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/revision|conflict|stale/i.test(message)) {
+    return "다른 작업에서 보고서가 먼저 변경되었습니다. 최신 내용을 불러온 뒤 다시 진행해 주세요.";
+  }
+  if (/role|allowed|permission|forbidden/i.test(message)) {
+    return "현재 담당자는 이 작업을 할 수 없습니다.";
+  }
+  return "작업을 완료하지 못했습니다. 보고서 상태를 확인한 뒤 다시 시도해 주세요.";
+}
+
 function ReportSection({ label, value }: { label: string; value: string | string[] | ReportSections["next_actions"] }) {
   return (
     <section className="lf-report-section">
       <h3>{label}</h3>
       {typeof value === "string" ? <p>{value}</p> : value.length === 0 ? (
-        <p className="lf-empty-copy">No external-reportable entries.</p>
+        <p className="lf-empty-copy">이번 주에 보고할 내용이 없습니다.</p>
       ) : (
         <ul>{value.map((item) => (
           <li key={typeof item === "string" ? item : `${item.action}-${item.owner}-${item.due_date}`}>
-            {typeof item === "string" ? item : <><strong>{item.action}</strong><span>{item.owner} · due {item.due_date}</span></>}
+            {typeof item === "string" ? item : <><strong>{item.action}</strong><span>{item.owner} · {item.due_date}까지</span></>}
           </li>
         ))}</ul>
       )}
@@ -143,7 +204,7 @@ export function ReportConsole() {
   const reload = useCallback(async () => {
     const response = await fetch("/api/mobile/reports", { cache: "no-store" });
     const result = await response.json() as ReportWorkflow & { error?: string };
-    if (!response.ok) throw new Error(result.error ?? "Unable to load the weekly report workflow.");
+    if (!response.ok) throw new Error(result.error ?? "주간 보고서를 불러오지 못했습니다.");
     setWorkflow(result);
   }, []);
 
@@ -183,15 +244,15 @@ export function ReportConsole() {
       if (!response.ok) throw new Error(result.error ?? `${action} failed.`);
       setWorkflow(result);
       const messages = {
-        draft: "A building-specific report draft was created from the current published snapshot.",
-        investigate: "The command produced a source-backed patch candidate. Review its evidence before deciding.",
-        decide_patch: options.decision === "accept" ? "The scoped patch was accepted into the draft." : "The candidate was rejected; report content is unchanged.",
-        approve: "LM Manager approval recorded. The report is eligible for sandbox delivery.",
-        send: "Sandbox delivery logged exactly once. No production email transport was used.",
+        draft: "현재 자산 정보를 기준으로 주간 보고서 초안을 만들었습니다.",
+        investigate: "확인 결과를 변경안으로 준비했습니다. 근거를 확인한 뒤 반영 여부를 결정해 주세요.",
+        decide_patch: options.decision === "accept" ? "선택한 변경안을 보고서에 반영했습니다." : "변경안을 반영하지 않았습니다. 기존 보고서는 그대로 유지됩니다.",
+        approve: "보고서 승인을 마쳤습니다. 이제 데모 전달을 진행할 수 있습니다.",
+        send: "데모 전달을 기록했습니다. 실제 이메일은 발송되지 않았습니다.",
       };
       setNotice({ severity: "success", message: messages[action] });
     } catch (error) {
-      setNotice({ severity: "error", message: error instanceof Error ? error.message : "Unknown report workflow error." });
+      setNotice({ severity: "error", message: friendlyReportError(error) });
       await reload().catch(() => undefined);
     } finally {
       setBusyAction(null);
@@ -201,12 +262,12 @@ export function ReportConsole() {
   if (!workflow) {
     return (
       <>
-        <a className="lf-skip-link" href="#report-content">Skip to weekly report workspace</a>
+        <a className="lf-skip-link" href="#report-content">주간 보고서로 바로가기</a>
         <div className="lf-product-shell">
           <AppNavigation current="reports" />
           <main id="report-content" className="lf-product-main">
-            <FeedbackPanel tone={notice ? "error" : "loading"} title={notice ? "Reports unavailable" : "Loading weekly report state"}>
-              {notice?.message ?? "Published materials, recipient configuration, and sandbox delivery state are being reconciled."}
+            <FeedbackPanel tone={notice ? "error" : "loading"} title={notice ? "보고서를 열 수 없습니다" : "주간 보고서를 불러오는 중"}>
+              {notice?.message ?? "잠시만 기다려 주세요."}
             </FeedbackPanel>
           </main>
         </div>
@@ -224,30 +285,26 @@ export function ReportConsole() {
 
   return (
     <>
-      <a className="lf-skip-link" href="#report-content">Skip to weekly report workspace</a>
+      <a className="lf-skip-link" href="#report-content">주간 보고서로 바로가기</a>
       <div className="lf-product-shell">
         <AppNavigation current="reports" />
         <main id="report-content" className="lf-product-main">
           <header className="lf-product-hero lf-product-hero--reports">
             <div className="lf-product-hero__copy">
-              <p className="lf-eyebrow">Operations / Weekly landlord report</p>
-              <h1>Investigate broadly. <span>Patch narrowly.</span></h1>
-              <p>
-                Five fixed Korean commands inspect synthetic activity and mock email. Each result remains a candidate until the LM Manager accepts its exact diff.
-              </p>
+              <p className="lf-eyebrow">주간 보고서</p>
+              <h1>이번 주 변동을 확인하고 <span>보고서를 완성하세요.</span></h1>
+              <p>저장된 업무 기록을 살펴보고, 필요한 변경만 검토한 뒤 승인합니다.</p>
             </div>
             <div className="lf-product-hero__meta">
-              <StatusBadge tone="info">{workflow.labels.mode}</StatusBadge>
-              <StatusBadge tone="warning">{workflow.labels.delivery}</StatusBadge>
-              <span className="lf-data-label">REV {workflow.revision.toString().padStart(3, "0")}</span>
+              <StatusBadge tone="info">데모</StatusBadge>
             </div>
           </header>
 
           {notice ? (
             <FeedbackPanel
               tone={notice.severity}
-              title={notice.severity === "success" ? "Report state updated" : "Action blocked without mutation"}
-              action={notice.severity === "error" ? <ActionButton variant="secondary" onClick={() => void reload()}>Reload current revision</ActionButton> : undefined}
+              title={notice.severity === "success" ? "보고서를 업데이트했습니다" : "작업을 완료하지 못했습니다"}
+              action={notice.severity === "error" ? <ActionButton variant="secondary" onClick={() => void reload()}>최신 내용 다시 불러오기</ActionButton> : undefined}
             >
               {notice.message}
             </FeedbackPanel>
@@ -257,20 +314,20 @@ export function ReportConsole() {
             <section className="lf-product-section" aria-labelledby="prepare-report">
               <GovernanceSurface variant={canDraft ? "accent" : "default"}>
                 <SectionHeading
-                  eyebrow="01 / Prerequisite"
+                  eyebrow="시작하기"
                   headingId="prepare-report"
-                  title={canDraft ? "Published data is ready" : "Publication required"}
+                  title={canDraft ? "보고서를 만들 준비가 되었습니다" : "자산 정보 게시가 필요합니다"}
                   description={canDraft
-                    ? "Create a building-specific draft from current, authorized, externally shareable synthetic records."
-                    : "Complete source extraction, junior confirmation, and senior publication in Data governance first."}
+                    ? "현재 자산 정보를 기준으로 이번 주 보고서 초안을 만듭니다."
+                    : "자산 정보에서 변경안을 확인하고 최종 게시까지 마쳐 주세요."}
                   action={canDraft
-                    ? <ActionButton loading={busyAction === "draft"} onClick={() => void mutate("draft")} trailingIcon={<ArrowUpRightIcon />}>Create weekly report</ActionButton>
-                    : <Link className="lf-button lf-button--secondary" href="/">Open data governance <span className="lf-button__island"><ArrowUpRightIcon /></span></Link>}
+                    ? <ActionButton loading={busyAction === "draft"} onClick={() => void mutate("draft")} trailingIcon={<ArrowUpRightIcon />}>주간 보고서 만들기</ActionButton>
+                    : <Link className="lf-button lf-button--secondary" href="/">자산 정보 열기 <span className="lf-button__island"><ArrowUpRightIcon /></span></Link>}
                 />
                 <dl className="lf-data-grid">
-                  <DataFact label="Publication stage" value={workflow.publication_stage.replaceAll("_", " ")} detail="server-enforced prerequisite" state={canDraft ? "verified" : "default"} />
-                  <DataFact label="Operator role" value={workflow.labels.role} detail="configured building access" />
-                  <DataFact label="Delivery mode" value={workflow.labels.delivery} detail="no production transport" />
+                  <DataFact label="자산 정보" value={canDraft ? "게시 완료" : "게시 전"} detail="보고서 기준 정보" state={canDraft ? "verified" : "default"} />
+                  <DataFact label="담당자" value="임대 관리자" detail="Cobalt Finance Center" />
+                  <DataFact label="전달 방식" value="데모" detail="실제 이메일은 발송되지 않습니다" />
                 </dl>
               </GovernanceSurface>
             </section>
@@ -278,23 +335,23 @@ export function ReportConsole() {
             <>
               <section className="lf-product-section" aria-labelledby="report-progress">
                 <SectionHeading
-                  eyebrow="01 / Workflow"
+                  eyebrow="진행 상황"
                   headingId="report-progress"
-                  title="Human-approved report lifecycle"
-                  description={`${report.building_id} · ${report.reporting_period.from} — ${report.reporting_period.to} · ${workflow.labels.role}`}
-                  action={<StatusBadge tone={statusTone(report.status)}>{report.status.replaceAll("_", " ")}</StatusBadge>}
+                  title="보고서 작성부터 전달까지"
+                  description={`Cobalt Finance Center · ${report.reporting_period.from} — ${report.reporting_period.to}`}
+                  action={<StatusBadge tone={statusTone(report.status)}>{reportStatusLabels[report.status]}</StatusBadge>}
                 />
                 <GovernanceSurface variant={report.status === "sent" ? "accent" : "default"}>
                   <ol className="lf-workflow">
-                    <WorkflowStep index={1} state={reportLifecycleStepState(reportProgress!, "draft")} title="Draft">Published facts only</WorkflowStep>
-                    <WorkflowStep index={2} state={reportLifecycleStepState(reportProgress!, "investigate")} title="Investigate">Candidate patch and evidence</WorkflowStep>
-                    <WorkflowStep index={3} state={reportLifecycleStepState(reportProgress!, "approve")} title="LM approval">Recipients and report reviewed</WorkflowStep>
-                    <WorkflowStep index={4} state={reportLifecycleStepState(reportProgress!, "send")} title="Sandbox delivery">Exactly-once activity log</WorkflowStep>
+                    <WorkflowStep index={1} state={reportLifecycleStepState(reportProgress!, "draft")} title="초안 작성">현재 자산 정보</WorkflowStep>
+                    <WorkflowStep index={2} state={reportLifecycleStepState(reportProgress!, "investigate")} title="변동 확인">업무 기록 검토</WorkflowStep>
+                    <WorkflowStep index={3} state={reportLifecycleStepState(reportProgress!, "approve")} title="최종 승인">내용과 수신자 확인</WorkflowStep>
+                    <WorkflowStep index={4} state={reportLifecycleStepState(reportProgress!, "send")} title="전달">데모 전달 기록</WorkflowStep>
                   </ol>
                   {report.status === "stale" ? (
                     <div className="lf-inline-feedback" role="alert">
-                      <strong>Stale report blocked</strong>
-                      <span>Source, recipient, or published material drift was detected. Reset the synthetic demo and create a fresh draft.</span>
+                      <strong>보고서를 다시 만들어야 합니다</strong>
+                      <span>기준 정보나 수신자가 변경되었습니다. 최신 내용으로 새 초안을 만들어 주세요.</span>
                     </div>
                   ) : null}
                 </GovernanceSurface>
@@ -304,7 +361,7 @@ export function ReportConsole() {
                 <section aria-labelledby="report-document">
                   <GovernanceSurface>
                     <SectionHeading
-                      eyebrow="02 / External document"
+                      eyebrow="보고서 미리보기"
                       headingId="report-document"
                       title="Cobalt Finance Center"
                       description={report.cover.subject}
@@ -315,8 +372,8 @@ export function ReportConsole() {
                       ))}
                     </div>
                     <div className="lf-attachment-row">
-                      <div><span className="lf-data-label">Approved attachment</span><strong>{report.attachments[0]?.filename ?? "No attachment"}</strong></div>
-                      <code>{report.attachments[0]?.version_id ?? "none"}</code>
+                      <div><span className="lf-data-label">첨부 파일</span><strong>{report.attachments[0]?.filename ?? "첨부 없음"}</strong></div>
+                      <details className="lf-technical-details"><summary>참고 정보</summary><code>{report.attachments[0]?.version_id ?? "없음"}</code></details>
                     </div>
                   </GovernanceSurface>
                 </section>
@@ -324,12 +381,12 @@ export function ReportConsole() {
                 <aside className="lf-product-rail" aria-labelledby="report-controls">
                   <GovernanceSurface variant="subtle">
                     <SectionHeading
-                      eyebrow="03 / Command surface"
+                      eyebrow="변동 확인"
                       headingId="report-controls"
                       level={2}
                       variant="compact"
-                      title="Run a fixed investigation"
-                      description="Commands are exact allowlisted instructions. They cannot silently rewrite official property data."
+                      title="저장된 업무 기록 확인"
+                      description="확인할 항목을 선택하면 보고서 변경안을 준비합니다."
                     />
                     <div className="lf-command-list">
                       {INVESTIGATION_COMMANDS.map((command, index) => (
@@ -341,13 +398,13 @@ export function ReportConsole() {
                           type="button"
                         >
                           <span>{(index + 1).toString().padStart(2, "0")}</span>
-                          <strong>{command}</strong>
-                          {busyAction === `investigate:${command}` ? <em>Investigating…</em> : null}
+                          <strong>{investigationCommandLabels[command]}</strong>
+                          {busyAction === `investigate:${command}` ? <em>확인 중…</em> : null}
                         </button>
                       ))}
                     </div>
                     <p className="lf-support-copy">
-                      Data sources: LeaseFlow synthetic activity plus external-reportable mock Outlook fixtures. Client-confidential mail is excluded server-side.
+                      데모 이메일과 업무 기록만 사용합니다. 비공개 메일은 결과에 포함되지 않습니다.
                     </p>
                   </GovernanceSurface>
                 </aside>
@@ -356,36 +413,36 @@ export function ReportConsole() {
               {report.pending_candidate ? (
                 <section className="lf-product-section" aria-labelledby="patch-review">
                   <SectionHeading
-                    eyebrow="04 / Candidate review"
+                    eyebrow="변경안 검토"
                     headingId="patch-review"
-                    title="Evidence before decision"
-                    description={report.pending_candidate.command}
-                    action={<StatusBadge tone="warning">Patch pending</StatusBadge>}
+                    title="근거를 확인한 뒤 반영하세요"
+                    description={investigationCommandLabel(report.pending_candidate.command)}
+                    action={<StatusBadge tone="warning">확인 필요</StatusBadge>}
                   />
                   <GovernanceSurface>
                     <div className="lf-patch-review">
                       <div className="lf-finding-list">
-                        <h3>Findings</h3>
+                        <h3>확인 결과</h3>
                         {report.pending_candidate.findings.map((finding) => (
                           <article key={`${finding.finding}-${finding.source_reference_ids.join("-")}`}>
-                            <span className="lf-confidence" aria-label={`${Math.round(finding.confidence * 100)} percent confidence`}>
+                            <span className="lf-confidence" aria-label={`자료 일치도 ${Math.round(finding.confidence * 100)}퍼센트`}>
                               {Math.round(finding.confidence * 100)}%
                             </span>
-                            <div><strong>{finding.finding}</strong><code>{finding.source_reference_ids.join(" · ")}</code></div>
+                            <div><strong>{friendlyReportSentence(finding.finding)}</strong><details className="lf-technical-details"><summary>근거 자료</summary><code>{finding.source_reference_ids.join(" · ")}</code></details></div>
                           </article>
                         ))}
                       </div>
                       <div className="lf-operation-list">
-                        <h3>Scoped operations</h3>
+                        <h3>보고서 변경 내용</h3>
                         {report.pending_candidate.operations.map((operation) => (
                           <article key={`${operation.section}-${operation.operation}-${operation.source_reference_ids.join("-")}`}>
                             <header>
-                              <div><span className="lf-data-label">{operation.operation}</span><strong>{sectionLabels[operation.section as keyof ReportSections] ?? operation.section}</strong></div>
-                              <code>{operation.source_reference_ids.join(" · ")}</code>
+                              <div><span className="lf-data-label">제안 변경</span><strong>{sectionLabels[operation.section as keyof ReportSections] ?? operation.section}</strong></div>
+                              <details className="lf-technical-details"><summary>근거 자료</summary><code>{operation.source_reference_ids.join(" · ")}</code></details>
                             </header>
                             <div className="lf-operation-diff">
-                              <div><span>Before</span><pre>{stringifyDiffValue(operation.before)}</pre></div>
-                              <div><span>After</span><pre>{stringifyDiffValue(operation.after)}</pre></div>
+                              <div><span>현재 내용</span><pre>{stringifyDiffValue(operation.before)}</pre></div>
+                              <div><span>제안 내용</span><pre>{stringifyDiffValue(operation.after)}</pre></div>
                             </div>
                           </article>
                         ))}
@@ -393,15 +450,15 @@ export function ReportConsole() {
                     </div>
                     {report.pending_candidate.unresolved.length > 0 ? (
                       <div className="lf-inline-feedback" role="alert">
-                        <strong>Unresolved questions</strong>
-                        <span>{report.pending_candidate.unresolved.map((item) => item.question).join(" · ")}</span>
+                        <strong>추가 확인이 필요합니다</strong>
+                        <span>{report.pending_candidate.unresolved.map((item) => friendlyReportSentence(item.question)).join(" · ")}</span>
                       </div>
                     ) : null}
                     <div className="lf-decision-bar">
-                      <div><strong>Content changes only after an explicit decision.</strong><span>Reject preserves the current draft exactly.</span></div>
+                      <div><strong>선택한 변경만 보고서에 반영됩니다.</strong><span>반영하지 않으면 기존 초안이 그대로 유지됩니다.</span></div>
                       <div className="lf-cluster">
-                        <ActionButton loading={busyAction === "patch:reject"} onClick={() => void mutate("decide_patch", { decision: "reject" })} variant="danger">Reject patch</ActionButton>
-                        <ActionButton disabled={report.pending_candidate.unresolved.length > 0} loading={busyAction === "patch:accept"} onClick={() => void mutate("decide_patch", { decision: "accept" })}>Accept scoped patch</ActionButton>
+                        <ActionButton loading={busyAction === "patch:reject"} onClick={() => void mutate("decide_patch", { decision: "reject" })} variant="ghost">반영하지 않기</ActionButton>
+                        <ActionButton disabled={report.pending_candidate.unresolved.length > 0} loading={busyAction === "patch:accept"} onClick={() => void mutate("decide_patch", { decision: "accept" })}>변경안 반영하기</ActionButton>
                       </div>
                     </div>
                   </GovernanceSurface>
@@ -410,36 +467,36 @@ export function ReportConsole() {
 
               <section className="lf-product-section" aria-labelledby="delivery-review">
                 <SectionHeading
-                  eyebrow="05 / Approval & delivery"
+                  eyebrow="승인과 전달"
                   headingId="delivery-review"
-                  title="Configured audience, human gate"
-                  description="Recipient groups are loaded from deterministic building configuration, never model invention."
+                  title="수신자와 최종 내용 확인"
+                  description="건물별로 등록된 수신자와 보고서 내용을 확인한 뒤 승인합니다."
                 />
                 <div className="lf-product-grid lf-product-grid--delivery">
                   <GovernanceSurface>
                     <div className="lf-recipient-panel">
                       <div>
-                        <span className="lf-data-label">To / practical owner</span>
+                        <span className="lf-data-label">받는 사람</span>
                         {report.recipients.to.map((recipient) => <strong key={recipient.email}>{recipient.email}</strong>)}
                       </div>
                       <div>
-                        <span className="lf-data-label">Cc / configured group</span>
-                        <ul>{report.recipients.cc.map((recipient) => <li key={recipient.email}>{recipient.email}<span>{recipient.role.replaceAll("_", " ")}</span></li>)}</ul>
+                        <span className="lf-data-label">참조</span>
+                        <ul>{report.recipients.cc.map((recipient) => <li key={recipient.email}>{recipient.email}<span>{recipientRoleLabel(recipient.role)}</span></li>)}</ul>
                       </div>
-                      <code>{report.recipients.configuration_id}</code>
+                      <details className="lf-technical-details"><summary>수신자 설정</summary><code>{report.recipients.configuration_id}</code></details>
                     </div>
                   </GovernanceSurface>
                   <GovernanceSurface variant={report.status === "approved" || report.status === "sent" ? "accent" : "subtle"}>
                     <div className="lf-approval-panel">
                       <div className="lf-cluster">
-                        <StatusBadge tone={report.approval.approved ? "success" : "neutral"}>{report.approval.approved ? "LM Manager approved" : "Approval required"}</StatusBadge>
-                        <StatusBadge tone={report.delivery.sent ? "success" : "warning"}>{report.delivery.sent ? "Sandbox logged" : workflow.labels.delivery}</StatusBadge>
+                        <StatusBadge tone={report.approval.approved ? "success" : "neutral"}>{report.approval.approved ? "승인 완료" : "승인 필요"}</StatusBadge>
+                        <StatusBadge tone={report.delivery.sent ? "success" : "warning"}>{report.delivery.sent ? "전달 완료" : "전달 전"}</StatusBadge>
                       </div>
-                      <h3>External report control</h3>
+                      <h3>최종 보고서</h3>
                       <p>{report.cover.body}</p>
                       <dl className="lf-data-grid lf-data-grid--rail">
-                        <DataFact label="Accepted patches" value={report.accepted_patch_count} detail="replayable history" />
-                        <DataFact label="Source references" value={report.sources.length} detail={report.sources.map((source) => source.id).join(" · ")} />
+                        <DataFact label="반영한 변경" value={report.accepted_patch_count} detail="검토 완료" />
+                        <DataFact label="확인한 자료" value={report.sources.length} detail="업무 기록과 이메일 자료" />
                       </dl>
                       <div className="lf-action-stack">
                         <ActionButton
@@ -447,7 +504,7 @@ export function ReportConsole() {
                           loading={busyAction === "approve"}
                           onClick={() => void mutate("approve")}
                         >
-                          Approve as LM Manager
+                          보고서 승인하기
                         </ActionButton>
                         <ActionButton
                           disabled={report.status !== "approved"}
@@ -456,23 +513,26 @@ export function ReportConsole() {
                           trailingIcon={<ArrowUpRightIcon />}
                           variant="secondary"
                         >
-                          Log sandbox delivery
+                          데모 전달하기
                         </ActionButton>
                       </div>
-                      <p className="lf-support-copy">No production Outlook, SMTP, carrier, or SSO integration is present or claimed.</p>
+                      <p className="lf-support-copy">데모 데이터만 사용하며 실제 이메일·전화·로그인 연동은 없습니다.</p>
                     </div>
                   </GovernanceSurface>
                 </div>
               </section>
 
               <section className="lf-product-section" aria-labelledby="report-provenance">
-                <SectionHeading eyebrow="06 / Provenance" headingId="report-provenance" title="External-reportable sources only" description="Every included source is building-scoped; confidential fixture mail never enters this projection." />
+                <SectionHeading eyebrow="확인 자료" headingId="report-provenance" title="보고서에 사용한 자료" description="이번 보고서에 반영된 업무 기록과 이메일 자료입니다." />
                 <GovernanceSurface variant="subtle">
                   <div className="lf-source-list">
                     {report.sources.map((source) => (
                       <article key={source.id}>
-                        <div><span className="lf-data-label">{source.source_type.replaceAll("_", " ")}</span><strong>{source.summary}</strong></div>
-                        <div><code>{source.id}</code><time dateTime={source.occurred_at}>{source.occurred_at}</time></div>
+                        <div><span className="lf-data-label">{sourceTypeLabels[source.source_type] ?? "업무 자료"}</span><strong>{source.summary}</strong></div>
+                        <div>
+                          <time dateTime={source.occurred_at}>{source.occurred_at}</time>
+                          <details className="lf-technical-details"><summary>참고 정보</summary><code>{source.id}</code></details>
+                        </div>
                       </article>
                     ))}
                   </div>

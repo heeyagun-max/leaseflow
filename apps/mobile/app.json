@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "LeaseFlow Copilot",
-    "slug": "leaseflow-copilot",
+    "name": "LeaseFlow 현장 업무",
+    "slug": "leaseflow-operations",
     "scheme": "leaseflow",
     "version": "0.1.0",
     "orientation": "portrait",

@@ -1,337 +1,197 @@
 # LeaseFlow Design System
 
-## 0. Research Log
+## 0. Research log
 
-- Embedded references: shortlisted Supabase, Linear, and Sentry; selected Layer A `soft-skill` + Layer B `supabase` because LeaseFlow needs premium material craft without losing an operations console's density, auditability, or restrained status color.
-- Lazyweb: three queries (`commercial real estate operations dashboard approval workflow`, `document review approval admin dashboard`, `field operations property mobile app workflow`), four screens viewed. Dealpath supplied approval-preview hierarchy and one clear CTA; Jobber supplied fixed navigation, a workflow strip, and a focused support rail; PandaDoc supplied compact state tabs, list-detail density, and an explicit timeline. The AppFolio mobile result was rejected because it is a property contact landing page, not an operations or approval workflow, and therefore offers no useful state, provenance, or task-density grammar.
-- UI/UX database: the operations query recommended a dark, status-led, data-dense system; the color lookup reinforced near-black/slate surfaces with accessible green state signals; the typography lookup reinforced a Korean-readable sans with a restrained mono companion. The generic Cinzel/Josefin real-estate pairing was rejected because it reduces scan speed in operational tables.
-- Imagen drafts: skipped for this primitive-only extraction milestone. The owner supplied a locked direction and a set of actual shipped-product references; no product screen may be composed until the primitive showcase passes.
-- Reference-use boundary: references inform layout grammar and component anatomy only. No logo, screenshot, copy, or brand-specific composition is copied or shipped.
+- 2026-07-18 redesign: the owner rejected the shipped dark developer-console language and the exposure of internal policy copy. The new direction is a calm global knowledge-work product for office teams.
+- OMO frontend routing: existing-product redesign, then layout repair and perfection audit. Layer B references shortlisted Notion, Airtable, and Mastercard; Notion was selected for warm restraint and progressive disclosure. Airtable informed structured-data density only.
+- UI/UX database: generic real-estate teal, display-serif, and dashboard-card recommendations were rejected because they reduce Korean scan speed and create an AI-template look. A documentation/knowledge-base palette and plain-language interaction guidance were retained.
+- No product screenshots, brand layouts, or reference copy are reproduced. References inform hierarchy, density, and interaction grammar only.
 
-## 1. Atmosphere & Identity
+## 1. Product atmosphere
 
-LeaseFlow is a quiet, high-trust operations command center: near-black, precise, and calm enough for long review sessions, but rich enough to make governed state feel tangible. Its signature is the **governance bezel**—a thin emerald-tinted outer tray around a dark inner work surface, with a top rim light and a restrained verification border. The memorable moment is a workflow state moving from neutral graphite to verified emerald only after a human-controlled transition; green never decorates unverified content.
+LeaseFlow is a quiet, precise workplace for people who review property information, coordinate decisions, and prepare external material. It should feel credible in a global enterprise: warm paper canvas, crisp white work surfaces, strong typography, restrained blue actions, and clear editorial spacing.
 
-The system combines Supabase's dark emerald identity, alpha-layered borders, regular-weight typography, and border-defined depth with the double-bezel material discipline from `soft-skill`. It intentionally avoids all gradients, over-rounded card grids, heavy shadows, glass blur on scrolling content, and ornamental motion.
+The product is not a system console. The primary interface speaks about the user's work, not the implementation. Technical metadata exists only where it helps troubleshooting or review and is progressively disclosed.
 
-### Design principles
+### Principles
 
-1. **State before spectacle.** Every surface answers “what state is this in, who owns the next action, and what evidence supports it?”
-2. **Green means governed.** Emerald signals a verified or primary interactive state, never unreviewed AI output.
-3. **Density with wayfinding.** Compact data is grouped by stage, provenance, and action so users do not need to remember hidden context.
-4. **One consequential action.** Each task region presents one visually dominant next action; destructive or irreversible actions are spatially separated.
-5. **Material restraint.** Depth comes from tonal surfaces, alpha borders, and inset rim light—not gradients, blur piles, or heavy drop shadows.
+1. **Work, not policy.** Lead with the task, its current state, and the next useful action.
+2. **Plain language.** Prefer “Review changes” over “candidate governance” and “Publish” over “server-authorized transition.”
+3. **One clear next step.** Each task region has one dominant action; secondary and destructive actions stay quiet.
+4. **Progressive disclosure.** IDs, version numbers, source references, and decision logs appear in secondary detail views, not page introductions.
+5. **Calm structure.** Hierarchy comes from spacing, type, alignment, and subtle borders—not neon color, nested bezels, or card decoration.
 
 ## 2. Color
 
-LeaseFlow is dark-mode native for this milestone. Semantic tokens are the only allowed color source in components.
+Semantic tokens are the only color source in components.
 
 | Role | CSS token | Value | Usage |
 | --- | --- | --- | --- |
-| Canvas/deep | `--lf-canvas-deep` | `#050807` | Atmospheric outer edge |
-| Canvas | `--lf-canvas` | `#070b0a` | Page background |
-| Surface/base | `--lf-surface-0` | `#0b110f` | Shell and bezel tray |
-| Surface/primary | `--lf-surface-1` | `#101815` | Primary panels |
-| Surface/secondary | `--lf-surface-2` | `#16211d` | Controls, nested regions |
-| Surface/elevated | `--lf-surface-3` | `#1c2a25` | Hover, selected, popover |
-| Surface/disabled | `--lf-surface-disabled` | `#121916` | Disabled control fill |
-| Text/primary | `--lf-text-1` | `#f4fbf7` | Headings and body |
-| Text/secondary | `--lf-text-2` | `#b6c7bf` | Supporting copy |
-| Text/tertiary | `--lf-text-3` | `#82978d` | Metadata and placeholders |
-| Text/disabled | `--lf-text-disabled` | `#9aaca3` | Disabled and loading labels; remains ≥4.5:1 on disabled surfaces |
-| Border/subtle | `--lf-border-subtle` | `rgba(214, 255, 235, 0.07)` | Quiet internal division |
-| Border/default | `--lf-border` | `rgba(214, 255, 235, 0.13)` | Controls and panel edges |
-| Border/strong | `--lf-border-strong` | `rgba(214, 255, 235, 0.23)` | Hover and active outline |
-| Rim light | `--lf-rim-light` | `rgba(244, 255, 249, 0.12)` | Inset top highlight |
-| Emerald/100 | `--lf-emerald-100` | `#d1fae5` | High-emphasis verified text |
-| Emerald/200 | `--lf-emerald-200` | `#a7f3d0` | Focus and primary text-on-dark |
-| Emerald/300 | `--lf-emerald-300` | `#6ee7b7` | Primary action fill |
-| Emerald/400 | `--lf-emerald-400` | `#34d399` | Active line and verified icon |
-| Emerald/500 | `--lf-emerald-500` | `#10b981` | Accent border and data mark |
-| Emerald/700 | `--lf-emerald-700` | `#047857` | Pressed accent depth |
-| Accent wash | `--lf-accent-wash` | `rgba(52, 211, 153, 0.10)` | Verified background layer |
-| Accent border | `--lf-accent-border` | `rgba(110, 231, 183, 0.34)` | Focused/verified boundary |
-| Status/success | `--lf-success` | `#6ee7b7` | Success icon and text |
-| Status/warning | `--lf-warning` | `#fcd34d` | Warning icon and text |
-| Status/error | `--lf-error` | `#fda4af` | Error icon and text |
-| Status/info | `--lf-info` | `#93c5fd` | Informational icon and text |
-| Warning wash | `--lf-warning-wash` | `rgba(252, 211, 77, 0.10)` | Warning surface |
-| Error wash | `--lf-error-wash` | `rgba(253, 164, 175, 0.10)` | Error surface |
-| Info wash | `--lf-info-wash` | `rgba(147, 197, 253, 0.10)` | Info surface |
-| Scrim | `--lf-scrim` | `rgba(2, 7, 5, 0.72)` | Modal isolation only |
-| Atmosphere/emerald | `--lf-atmosphere-emerald` | `rgba(16, 185, 129, 0.13)` | Flat page-edge verification border |
+| Canvas/deep | `--lf-canvas-deep` | `#ebe9e4` | Page edge and mobile browser surround |
+| Canvas | `--lf-canvas` | `#f7f6f3` | Primary page background |
+| Surface/base | `--lf-surface-0` | `#f0efeb` | Quiet grouped region |
+| Surface/primary | `--lf-surface-1` | `#ffffff` | Main work surface |
+| Surface/secondary | `--lf-surface-2` | `#f5f4f1` | Inputs, nested rows, secondary regions |
+| Surface/elevated | `--lf-surface-3` | `#eceae5` | Hover and selected state |
+| Surface/disabled | `--lf-surface-disabled` | `#f1f0ed` | Disabled controls |
+| Text/primary | `--lf-text-1` | `#23211f` | Headings and body |
+| Text/secondary | `--lf-text-2` | `#57534e` | Supporting copy |
+| Text/tertiary | `--lf-text-3` | `#6a655f` | Metadata |
+| Text/disabled | `--lf-text-disabled` | `#8c8780` | Disabled labels |
+| Border/subtle | `--lf-border-subtle` | `rgba(35, 33, 31, 0.07)` | Quiet division |
+| Border/default | `--lf-border` | `rgba(35, 33, 31, 0.11)` | Controls and panel edges |
+| Border/strong | `--lf-border-strong` | `rgba(35, 33, 31, 0.20)` | Active and hover boundary |
+| Rim light | `--lf-rim-light` | `rgba(255, 255, 255, 0.92)` | Subtle top highlight |
+| Accent/100 | `--lf-emerald-100` | `#e8f1fb` | Informational wash |
+| Accent/200 | `--lf-emerald-200` | `#cfe2f7` | Focus wash |
+| Accent/300 | `--lf-emerald-300` | `#76a9df` | Secondary accent |
+| Accent/400 | `--lf-emerald-400` | `#3f7fbd` | Focus and selected mark |
+| Accent/500 | `--lf-emerald-500` | `#2563a6` | Primary action |
+| Accent/700 | `--lf-emerald-700` | `#194b7d` | Pressed action |
+| Accent wash | `--lf-accent-wash` | `rgba(37, 99, 166, 0.08)` | Selected background |
+| Accent border | `--lf-accent-border` | `rgba(37, 99, 166, 0.30)` | Focus boundary |
+| Success | `--lf-success` | `#287a4b` | Completed state |
+| Warning | `--lf-warning` | `#9a5b14` | Attention state |
+| Error | `--lf-error` | `#b33a3a` | Error state |
+| Info | `--lf-info` | `#2d69a8` | Informational state |
+| Warning wash | `--lf-warning-wash` | `rgba(154, 91, 20, 0.08)` | Warning surface |
+| Error wash | `--lf-error-wash` | `rgba(179, 58, 58, 0.07)` | Error surface |
+| Info wash | `--lf-info-wash` | `rgba(45, 105, 168, 0.07)` | Info surface |
+| Scrim | `--lf-scrim` | `rgba(31, 29, 27, 0.42)` | Modal isolation only |
+| Atmosphere/accent | `--lf-atmosphere-emerald` | `rgba(37, 99, 166, 0.06)` | Compatibility token; never decorative |
 
 ### Color rules
 
-- Body text must meet WCAG 2.2 AA: 4.5:1 for normal text and 3:1 for large text and UI graphics.
-- Status is never conveyed by color alone; pair the token with text and an icon or shape.
-- Emerald is reserved for primary interaction, focus, and governed success. Candidate AI content stays neutral or informational until confirmed.
-- Component files contain no raw hex, RGB, or HSL values. Add or revise the table first.
-- Large green fills are prohibited. The perceptual ramp must appear through small signals, focus, controlled CTA fills, and rim accents.
-- Atmosphere tokens are canvas-only and static. They never communicate state, sit behind text as the sole contrast layer, or animate.
-- Unprefixed compatibility aliases (`--ink`, `--muted`, `--line`, `--green`, `--teal`, `--bg`) were removed. Legacy route classes remain temporarily scoped under `.lf-legacy-page`; new primitives must use only `--lf-*` tokens and `.lf-*` classes.
+- Body contrast targets WCAG 2.2 AA. Status never relies on color alone.
+- Blue is reserved for links, focus, selected navigation, and the primary action.
+- Green means completed or ready. Amber means attention. Neither decorates neutral content.
+- No gradients, dark console chrome, luminous borders, or large tinted panels.
 
-## 3. Typography
+## 3. Typography and voice
 
 ### Families
 
-- Primary: `"Avenir Next", "Apple SD Gothic Neo", "Noto Sans KR", ui-rounded, sans-serif`. Avenir gives the rounded geometric warmth of the chosen Supabase reference; Apple SD Gothic Neo/Noto Sans KR preserve Korean legibility.
-- Mono: `"SFMono-Regular", "Cascadia Code", "Roboto Mono", ui-monospace, monospace`. Mono is limited to IDs, revisions, dates, provenance, and numeric data.
-- No display serif. Operational scan speed outranks real-estate editorial convention.
+- Primary: `"SF Pro Text", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`.
+- Data: the same family with tabular numerals. Monospace is limited to an explicitly opened technical detail.
+- No display serif, forced uppercase, or letter-spaced technical labels in primary product UI.
 
 ### Scale
 
-| Role | Token | Size | Weight | Line-height | Tracking | Usage |
-| --- | --- | --- | --- | --- | --- | --- |
-| Display | `--lf-type-display` | `clamp(2.25rem, 5vw, 4.5rem)` | 400 | 1.00 | -0.035em | Showcase or major task title only |
-| H1 | `--lf-type-h1` | `clamp(1.75rem, 3vw, 2.25rem)` | 400 | 1.12 | -0.025em | Page title |
-| H2 | `--lf-type-h2` | `1.5rem` | 450 | 1.25 | -0.018em | Region title |
-| H3 | `--lf-type-h3` | `1.125rem` | 500 | 1.35 | -0.01em | Card title |
-| Body/large | `--lf-type-body-lg` | `1.0625rem` | 400 | 1.6 | 0 | Introductory copy |
-| Body | `--lf-type-body` | `1rem` | 400 | 1.55 | 0 | Default text and controls |
-| Body/small | `--lf-type-body-sm` | `0.875rem` | 400 | 1.5 | 0 | Secondary rows and metadata |
-| Label | `--lf-type-label` | `0.75rem` | 600 | 1.35 | 0.08em | Uppercase technical labels |
-| Data | `--lf-type-data` | `0.8125rem` | 500 | 1.45 | 0.02em | IDs, audit timestamps, numeric facts |
+| Role | Size | Weight | Line-height | Usage |
+| --- | --- | --- | --- | --- |
+| Page title | `clamp(1.85rem, 3vw, 2.65rem)` | 650 | 1.14 | One task-oriented `h1` |
+| Section title | `1.35rem` | 620 | 1.3 | Major region |
+| Card title | `1rem` | 620 | 1.4 | Group title |
+| Body large | `1.0625rem` | 400 | 1.65 | Short introduction |
+| Body | `0.9375rem` | 400 | 1.6 | Default copy and controls |
+| Small | `0.8125rem` | 450 | 1.5 | Secondary metadata |
+| Label | `0.75rem` | 600 | 1.4 | Short sentence-case label |
 
-### Typography rules
+### Content rules
 
-- Body and controls never fall below 14px; the 12px label is uppercase, short, and never used for essential prose.
-- Headings use regular or medium weight. Scale, rhythm, and contrast establish hierarchy; 700+ weight is prohibited.
-- Operational numbers use tabular figures. Long IDs use `overflow-wrap: anywhere` and remain copyable.
-- Korean and English may coexist without forced uppercase; uppercase is limited to short Latin technical labels.
-- Readable prose is capped at 68ch. Dense data may use the full work surface.
+- Page copy answers: What is this? What needs attention? What can I do next?
+- Primary UI must not use: governed, control plane, server-side, adapter, mutation, optimistic concurrency, provenance, allowlisted, scoped patch, projection, sandbox-only, mock Outlook, or raw enum values.
+- Use human labels: “Review changes,” “Current information,” “Decision history,” “Demo email,” and “Approve and send.”
+- Show the demo boundary once per surface: “Demo data only. No email, phone, or sign-in connection.”
+- Avoid explaining authorization and publication rules unless the user opens help or a relevant error occurs.
+- Buttons start with a concrete verb. Success messages state the result and next step in one sentence.
 
-## 4. Spacing & Layout
+## 4. Spacing and layout
 
-### Spacing scale
-
-The base unit is 4px.
-
-| Token | Value | Intent |
-| --- | --- | --- |
-| `--lf-space-1` | 4px | Hairline alignment and icon gap |
-| `--lf-space-2` | 8px | Tight cluster |
-| `--lf-space-3` | 12px | Compact row |
-| `--lf-space-4` | 16px | Default control/card gap |
-| `--lf-space-5` | 20px | Comfortable group |
-| `--lf-space-6` | 24px | Panel padding |
-| `--lf-space-8` | 32px | Region gap |
-| `--lf-space-10` | 40px | Major internal break |
-| `--lf-space-12` | 48px | Section separation |
-| `--lf-space-16` | 64px | Desktop page breathing room |
-| `--lf-space-20` | 80px | Showcase-only macro rhythm |
-
-### Geometry and layout tokens
+Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
 
 | Token | Value | Usage |
 | --- | --- | --- |
-| `--lf-content-max` | 1280px | Admin content limiter |
-| `--lf-copy-max` | 68ch | Prose measure |
-| `--lf-control-min` | 44px | Minimum pointer/touch target |
-| `--lf-row-compact` | 48px | Dense operational row floor |
-| `--lf-radius-sm` | 8px | Inline chip and compact control |
-| `--lf-radius-md` | 12px | Inputs and secondary controls |
-| `--lf-radius-lg` | 18px | Inner work surface |
-| `--lf-radius-xl` | 24px | Governance bezel outer tray |
-| `--lf-radius-pill` | 999px | Status and primary island action |
-| `--lf-icon-sm` | 16px | Inline status glyph |
-| `--lf-icon-md` | 20px | Control glyph |
-| `--lf-icon-lg` | 24px | Region glyph |
+| `--lf-content-max` | `1240px` | Admin content limiter |
+| `--lf-copy-max` | `62ch` | Prose measure |
+| `--lf-control-min` | `44px` | Minimum action target |
+| `--lf-row-compact` | `48px` | Dense row floor |
+| `--lf-radius-sm` | `6px` | Tags and small controls |
+| `--lf-radius-md` | `9px` | Buttons and inputs |
+| `--lf-radius-lg` | `12px` | Main work surface |
+| `--lf-radius-xl` | `16px` | Large grouped region |
+| `--lf-radius-pill` | `999px` | Status only |
 
-### Grid and responsiveness
-
-- Content uses a 12-column conceptual desktop grid, `32px` desktop gutters, `24px` tablet gutters, and `16px` mobile gutters.
-- Required QA widths: 375px, 768px, and 1280px. Page-frame changes may use media queries; primitives prefer intrinsic sizing and container queries.
-- Use `repeat(auto-fit, minmax(min(16rem, 100%), 1fr))` for repeatable panels so unbroken content cannot force horizontal overflow.
-- At 375px, primary content is one readable column with no horizontal scroll. Secondary metadata wraps or moves below the primary label.
-- At 200% zoom, all actions and state descriptions remain reachable without two-dimensional scrolling.
-- Full-height shells use `100dvh`/`100dvb`; never `100vh` or `h-screen`.
-- For a fixed shell, the work body is the named scroll owner and must have `min-block-size: 0; overflow: auto`. Nested scrollbars require an explicit job.
-
-### Spatial primitives
-
-- `stack`: vertical rhythm with tokenized gap.
-- `cluster`: wrapping action/tag row; it wraps before overflow.
-- `content-limiter`: max 1280px with fluid inline gutters.
-- `switcher`: equal regions that stack intrinsically when their content floor is reached.
-- `workflow-rail`: an explicit four-column ordered progression on desktop, a 2×2 grid at tablet widths, and a vertical stack at mobile widths.
-- `governance-bezel`: outer tray plus inner surface; it is material styling, not an extra scroll owner.
+- Desktop uses a 12-column conceptual grid with 32px gutters; tablet 24px; mobile 16px.
+- Required QA widths are 375, 768, and 1280px. Primary content must never require horizontal scrolling.
+- Admin navigation remains compact and sticky only when it does not steal vertical workspace.
+- Primary/secondary layouts use a wide work area and a 280–320px action rail. They stack before content becomes cramped.
+- Repeated facts use intrinsic grids. Tables are reserved for real row comparison, not decorative metrics.
+- On mobile, sections form one reading column and actions follow the content they affect.
 
 ## 5. Components
 
-### `GovernanceSurface`
+### Work surface (`GovernanceSurface` in code)
 
-- **Structure:** semantic container → outer `.lf-surface` tray → inner `.lf-surface__core` work surface.
-- **Variants:** `default`, `accent`, `subtle`.
-- **Spacing:** inner padding `--lf-space-5` on mobile and `--lf-space-6` above 768px.
-- **States:** default, hover when interactive, focus-within, selected/accent, disabled by composed content.
-- **Accessibility:** caller chooses the correct landmark/heading relationship; no clickable `div`.
-- **Motion:** interactive surfaces use micro transform/opacity/rim changes only.
-- **Layout:** governance bezel; never owns scroll unless explicitly documented by the caller.
+- Renders as one white surface with a whisper border and subtle four-layer ambient shadow.
+- The existing code name is retained to avoid behavioral churn; no visible copy uses “governance.”
+- No outer tray, double bezel, neon rim, or nested card decoration.
+- Interactive states use border/color/opacity only. The surface never becomes a click target by accident.
 
-### `ActionButton`
+### Action button
 
-- **Structure:** native `<button>` or `<a>` → label → optional nested circular trailing icon.
-- **Variants:** `primary`, `secondary`, `ghost`, `danger`.
-- **Spacing:** minimum 44px block size; `--lf-space-4` inline padding; pill radius for primary, medium radius for other variants.
-- **States:** default, hover, active, focus-visible, disabled, loading. Loading preserves width and announces progress.
-- **Accessibility:** native semantics, visible label, `aria-busy` for loading, `disabled` for unavailable actions, 3px focus outline with offset.
-- **Motion:** 140ms press and 220ms affordance transitions using the system curves; only transform and opacity animate.
-- **Layout:** cluster child. One primary button per task region.
+- 44px minimum height, 9px radius, compact label, optional 16px trailing icon.
+- Primary is restrained blue with white text. Secondary is white with a neutral border. Ghost is text-forward.
+- One primary action per task region. Reset and destructive actions are visually separated.
+- Loading preserves label width and exposes `aria-busy`; disabled reasons are explained near the task, not inside technical tooltips.
 
-### `StatusBadge`
+### Status badge
 
-- **Structure:** inline status dot/icon + visible text.
-- **Variants:** `neutral`, `info`, `warning`, `success`, `error`.
-- **Spacing:** `--lf-space-2` inline cluster with pill radius.
-- **States:** status variants only; not interactive unless composed as a button.
-- **Accessibility:** color is reinforced by icon/shape and text; use `role="status"` only for live changes.
-- **Motion:** none for static state; live state may crossfade with reduced-motion fallback.
-- **Layout:** wrapping cluster item.
+- Short sentence-case status with a small dot/icon. Examples: “Ready to review,” “Waiting for approval,” “Published.”
+- Badges do not carry IDs, environment names, or implementation state.
 
-### `SectionHeading`
+### Section heading
 
-- **Structure:** optional eyebrow → heading → description → optional action cluster.
-- **Variants:** `page`, `section`, `compact`.
-- **Spacing:** `--lf-space-2` internal stack and `--lf-space-5` before content.
-- **States:** static.
-- **Accessibility:** heading level is explicit; one `h1` per route; description remains under 68ch.
-- **Motion:** none.
-- **Layout:** stack with actions switching below content when space is constrained.
+- Optional quiet context line, concise heading, one-sentence description, optional action.
+- Numbered technical eyebrows such as “03 / Role boundary” are prohibited in production UI.
 
-### `WorkflowStep`
+### Workflow step
 
-- **Structure:** numbered/state glyph → title/copy → optional owner metadata.
-- **Variants:** `pending`, `current`, `complete`, `blocked`.
-- **Spacing:** compact row floor 48px with `--lf-space-3` gap.
-- **States:** current uses accent line plus “Current” text; complete has verified icon/text; blocked has error text; never color alone.
-- **Accessibility:** ordered-list semantics; current step uses `aria-current="step"`.
-- **Motion:** verified transition may use a 220ms opacity/scale confirmation, disabled under reduced motion.
-- **Layout:** workflow rail; four columns above 800px, 2×2 from 481–800px, and one column at 480px or below.
+- Uses an ordered list with plain task names: “Source,” “Review,” “Approval,” “Published.”
+- Current and completed states include visible text, not color alone.
+- Desktop is four columns; tablet 2×2; mobile vertical.
 
-### `FeedbackPanel`
+### Data fact and candidate change
 
-- **Structure:** semantic icon → title → recovery-oriented description → optional action.
-- **Variants:** `loading`, `empty`, `success`, `error`, `info`.
-- **Spacing:** `--lf-space-5` internal stack.
-- **States:** all variants are persistent examples in the showcase; loading uses an opacity pulse only.
-- **Accessibility:** `aria-live="polite"` for loading/success, `role="alert"` for errors, action describes recovery rather than “Try again” without context.
-- **Motion:** loading pulse is 1.6s opacity-only and disabled for reduced motion.
-- **Layout:** content-limited stack; never collapses to a blank frame.
+- Label → clear value → optional supporting detail.
+- Before/after changes use “Previous” and “Suggested,” with values visually aligned.
+- Source reference, confidence, and version ID live in a secondary disclosure. Confidence may be shown by default only when it materially helps review.
 
-### `DataFact`
+### Decision history
 
-- **Structure:** label → primary value → provenance/detail.
-- **Variants:** `default`, `verified`, `candidate`.
-- **Spacing:** compact stack with tabular/mono value support.
-- **States:** verified and candidate include visible text labels in addition to color.
-- **Accessibility:** definition-list semantics when grouped; IDs wrap anywhere; no tooltip-only content.
-- **Motion:** none.
-- **Layout:** intrinsic grid using the overflow-safe track contract.
+- Human-readable event label first, person and date second.
+- Raw event keys, actor IDs, and storage metadata are not primary content.
 
-### Mobile operations primitives
+## 6. Mobile product contract
 
-The Expo operations surface ships a native counterpart to the web system. It uses the same semantic palette and governance model while keeping its geometry in `apps/mobile/src/styles/theme.ts`; controls, borders, line heights, tracking, icon sizes, copy limits, intrinsic floors, and responsive breakpoints must use those tokens rather than route-local numbers.
+- Mobile uses the same warm palette and typography, adapted for touch and outdoor readability.
+- The opening view says “Today’s work” and surfaces requests and weekly reports. It does not describe publication policy.
+- Current property information uses familiar labels: available area, rent-free, parking support, and floor plan.
+- Superseded files are silently excluded from packages. Mention them only in a relevant warning or history view.
+- Internal labels such as `CONTROL PLANE`, revision, audit events, fixture, candidate patch, and confidential enum values are prohibited.
+- A single boundary note is enough: “Demo data only. No email, phone, or sign-in connection.”
+- Touch targets are at least 44×44px; actions are never arranged more than two abreast at 375px.
+- System text scaling, reduced motion, increased contrast, and screen-reader labels must remain supported.
 
-#### `Mobile MetricCard`
+## 7. Motion and depth
 
-- **Structure:** tabular primary metric → visible operational label.
-- **Variants:** `neutral`, `info`, `warning`, `success`, `error`; meaning is always present in the label/value and never color alone.
-- **Layout:** intrinsic wrapping item with a tokenized 120px preferred floor, `minWidth: 0`, and a 100% maximum so four metrics collapse without horizontal scrolling.
-- **Contrast:** increased-contrast mode promotes the label to primary text and strengthens the existing one-pixel boundary without changing layout bounds.
+- Motion explains input feedback or state change only. Use 140ms press and 220ms state transitions.
+- Animate transform and opacity only; reduced-motion removes nonessential transitions.
+- Page background is flat warm neutral. Work surfaces use a 1px border plus subtle layered shadows:
+  `0 1px 1px rgba(31,29,27,.02)`, `0 2px 4px rgba(31,29,27,.025)`, `0 8px 24px rgba(31,29,27,.035)`, `0 20px 48px rgba(31,29,27,.025)`.
+- Do not use glass blur, gradients, floating-card grids, or heavy shadows.
 
-#### `Mobile DataRow`
-
-- **Structure:** mono source label → primary value → optional provenance/detail.
-- **Variants:** `neutral`, `candidate`, `verified`; candidate and verified remain explicit in surrounding workflow copy.
-- **Layout:** tokenized 220px preferred floor with `minWidth: 0`, wrapping values, and no intrinsic-width ownership. It is safe inside a 375px governance bezel.
-- **Contrast:** label, detail, and operational boundary are strengthened together under iOS high-text-contrast or web `prefers-contrast: more`.
-
-#### `Mobile WorkflowRail`
-
-- **Structure:** ordered collection of step rows; each row contains a numbered/state index plus label and visible state text.
-- **Variants:** `pending`, `current`, `complete`, `blocked`; the current and completed states retain text in addition to the state color/glyph.
-- **Layout:** steps wrap from their tokenized 148px preferred floor, then shrink safely with `minWidth: 0`; index geometry and row height use shared icon/control tokens.
-- **Contrast:** step boundary, index boundary, index text, label, and pending state text all strengthen as one contract. Semantic info/success/error colors remain intact.
-
-#### `Mobile MonoText`
-
-- **Structure:** selectable operational revision, identifier, or audit metadata text.
-- **Layout:** mono font, tabular numerals, tokenized data line height; the containing layout owns wrapping and width.
-- **Contrast:** secondary mono copy promotes to primary text in increased-contrast mode.
-
-#### `Mobile Divider`
-
-- **Structure:** noninteractive one-pixel operational boundary.
-- **Layout:** full available width with tokenized border thickness and vertical rhythm.
-- **Contrast:** subtle border color promotes to the strong text boundary color without increasing thickness or shifting content.
-
-#### Mobile adaptive contract
-
-- **375px / narrow:** workspace surfaces are content-sized, `width: 100%`, and never receive flex growth; nested command, data, feedback, and before/after regions use preferred flex bases plus `minWidth: 0` and `maxWidth: 100%`.
-- **700px / tablet:** copy sizing and status regions expand, metric spacing increases, and report command groups may use two intrinsic columns.
-- **1080px / wide:** request and report workspaces become equal flex siblings; flex behavior is applied only at this breakpoint.
-- **Reduced motion:** native `AccessibilityInfo.isReduceMotionEnabled()` removes press and hover transforms while retaining immediate border feedback and state copy.
-- **Increased contrast:** native high-text-contrast and web `prefers-contrast: more` strengthen nested text and boundaries across surfaces, metrics, data rows, workflow steps, feedback, mono metadata, and dividers. No component changes border thickness during the transition.
-
-## 6. Motion & Interaction
-
-| Token | Duration | Curve | Usage |
-| --- | --- | --- | --- |
-| `--lf-motion-press` | 140ms | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Press feedback and icon shift |
-| `--lf-motion-state` | 220ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Hover, focus, state crossfade |
-| `--lf-motion-panel` | 360ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Panel/route emphasis |
-
-- Motion must explain affordance or a state transition. Decorative ambient animation is prohibited.
-- Animate only `transform`, `opacity`, and, for focus/hover material response, color/border-color. Never animate layout properties.
-- Controls provide visible feedback within 100ms of input and remain interruptible.
-- Disabled and loading controls retain fully opaque required state labels; distinction comes from the disabled surface, border, cursor, native state, and explicit copy rather than fading the entire control.
-- Active buttons scale to 0.985; nested glyphs may translate by one spacing unit. No layout bounds change.
-- `prefers-reduced-motion: reduce` removes transforms, pulses, and nonessential transitions while preserving instant state clarity.
-- `prefers-contrast: more` strengthens borders and text separation without changing meaning.
-
-## 7. Depth & Surface
-
-Strategy: **mixed tonal-shift + alpha border + inset rim**, with no generic drop-shadow cards.
-
-| Level | Recipe | Use |
-| --- | --- | --- |
-| Canvas | Flat deep canvas + restrained top verification border | Page atmosphere |
-| Tray | `--lf-surface-0`, subtle outer border, 4px padding, XL radius | Governance bezel outer shell |
-| Work surface | `--lf-surface-1`, default border, inset top rim, LG radius | Primary panel core |
-| Raised state | `--lf-surface-2`, strong border, brighter rim | Hover, selected, nested control |
-| Governed state | Accent wash + accent border + emerald mark | Verified/approved/published only |
-
-- Backdrop blur is reserved for a future fixed overlay or fixed navigation surface. It is prohibited on scrolling panels.
-- Gradients are prohibited. Page atmosphere and governed hierarchy use flat tokenized surfaces and borders.
-- No arbitrary `box-shadow`. The only permitted shadow is the inset rim recipe expressed as a tokenized system surface.
-- Large cards use concentric radii: 24px outer and 18px inner with a 4px tray gap.
-
-## 8. Accessibility Constraints & Accepted Debt
-
-### Inclusive personas and constraints
+## 8. Accessibility and personas
 
 | Persona | Context | Pass condition |
 | --- | --- | --- |
-| Junior Data Steward | Keyboard-heavy source review; may be interrupted and resume later | Current stage, next action, candidate status, and recovery message are explicit without relying on memory or color |
-| Senior Reviewer | Reviews provenance and performs consequential approval/publication | Evidence and version state remain adjacent to the action; focus order reaches the final action predictably; irreversible action is not visually confusable with reset |
-| LM Manager | Situational mobile/field use, glare, one-handed input, time pressure | 44px targets, high contrast, concise state labels, and single-column reflow preserve task completion |
-| Low-vision reviewer | 200% zoom or increased contrast | No two-dimensional scrolling for primary content; text and controls remain distinguishable and keyboard reachable |
-| Motion-sensitive user | Reduced-motion preference | No pulse, transform, or entrance movement is required to understand status or operate the interface |
+| Data reviewer | Keyboard-heavy review with interruptions | Current task, next action, and recovery state are explicit without memory or color |
+| Senior approver | Reviews consequential external material | Evidence is adjacent to approval and irreversible actions are clearly separated |
+| Property manager | Mobile, glare, one-handed use, time pressure | Concise labels, 44px targets, and a single-column path preserve task completion |
+| Low-vision user | 200% zoom or increased contrast | No two-dimensional primary-content scrolling; focus and state remain visible |
+| Motion-sensitive user | Reduced motion | No movement is required to understand or use the product |
 
-### Constraints
-
-- Target WCAG 2.2 AA. Body contrast ≥4.5:1, large text and UI graphics ≥3:1.
-- Every interactive element is keyboard reachable with an unmistakable `:focus-visible` state.
-- Minimum target size is 44×44px with at least 8px between adjacent targets.
-- Visible labels, headings, errors, and recovery actions are required; placeholder-only instructions are prohibited.
-- Status, selection, and progress never rely on color alone.
-- Semantic landmarks, ordered workflow steps, native buttons, `aria-current`, `aria-busy`, and live-region behavior are preferred over custom ARIA.
-- Content survives 375px, 768px, 1280px, 200% zoom, long Korean/English labels, empty data, and unbroken IDs.
-- Forced colors retain outlines and state labels. Reduced motion and increased contrast preferences are honored.
-
-### Accepted debt
-
-| Item | Location | Why accepted | Owner / Exit |
-| --- | --- | --- | --- |
-| None accepted | — | Accessibility or persona debt cannot be silently deferred | Record exact affected users, severity, fix, owner, and explicit user acknowledgement before accepting debt |
+- Target WCAG 2.2 AA; every action is keyboard reachable with a visible focus state.
+- Use landmarks, native controls, ordered workflow lists, live regions, and `aria-current` before custom ARIA.
+- Test 375px, 768px, 1280px, 200% zoom, long Korean/English labels, loading, empty, error, and success states.
+- No accessibility or persona debt is silently accepted.

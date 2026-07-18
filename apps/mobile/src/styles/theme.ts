@@ -1,36 +1,36 @@
 import { Platform, type TextStyle, type ViewStyle } from "react-native";
 
 export const colors = {
-  canvasDeep: "#050807",
-  canvas: "#070b0a",
-  surface0: "#0b110f",
-  surface1: "#101815",
-  surface2: "#16211d",
-  surface3: "#1c2a25",
-  surfaceDisabled: "#121916",
-  text1: "#f4fbf7",
-  text2: "#b6c7bf",
-  text3: "#82978d",
-  textDisabled: "#9aaca3",
-  borderSubtle: "rgba(214, 255, 235, 0.07)",
-  border: "rgba(214, 255, 235, 0.13)",
-  borderStrong: "rgba(214, 255, 235, 0.23)",
-  rimLight: "rgba(244, 255, 249, 0.12)",
-  emerald100: "#d1fae5",
-  emerald200: "#a7f3d0",
-  emerald300: "#6ee7b7",
-  emerald400: "#34d399",
-  emerald500: "#10b981",
-  emerald700: "#047857",
-  accentWash: "rgba(52, 211, 153, 0.10)",
-  accentBorder: "rgba(110, 231, 183, 0.34)",
-  success: "#6ee7b7",
-  warning: "#fcd34d",
-  error: "#fda4af",
-  info: "#93c5fd",
-  warningWash: "rgba(252, 211, 77, 0.10)",
-  errorWash: "rgba(253, 164, 175, 0.10)",
-  infoWash: "rgba(147, 197, 253, 0.10)",
+  canvasDeep: "#ebe9e4",
+  canvas: "#f7f6f3",
+  surface0: "#f0efeb",
+  surface1: "#ffffff",
+  surface2: "#f5f4f1",
+  surface3: "#eceae5",
+  surfaceDisabled: "#f1f0ed",
+  text1: "#23211f",
+  text2: "#57534e",
+  text3: "#6a655f",
+  textDisabled: "#8c8780",
+  borderSubtle: "rgba(35, 33, 31, 0.07)",
+  border: "rgba(35, 33, 31, 0.11)",
+  borderStrong: "rgba(35, 33, 31, 0.20)",
+  rimLight: "rgba(255, 255, 255, 0.92)",
+  emerald100: "#e8f1fb",
+  emerald200: "#cfe2f7",
+  emerald300: "#76a9df",
+  emerald400: "#3f7fbd",
+  emerald500: "#2563a6",
+  emerald700: "#194b7d",
+  accentWash: "rgba(37, 99, 166, 0.08)",
+  accentBorder: "rgba(37, 99, 166, 0.30)",
+  success: "#287a4b",
+  warning: "#9a5b14",
+  error: "#b33a3a",
+  info: "#2d69a8",
+  warningWash: "rgba(154, 91, 20, 0.08)",
+  errorWash: "rgba(179, 58, 58, 0.07)",
+  infoWash: "rgba(45, 105, 168, 0.07)",
 } as const;
 
 export const space = {
@@ -47,18 +47,18 @@ export const space = {
 } as const;
 
 export const radius = {
-  small: 8,
-  medium: 12,
-  inner: 18,
-  tray: 24,
+  small: 6,
+  medium: 9,
+  inner: 12,
+  tray: 16,
   pill: 999,
 } as const;
 
 export const type = {
-  display: 40,
-  h1: 32,
-  h2: 24,
-  h3: 18,
+  display: 42,
+  h1: 34,
+  h2: 22,
+  h3: 17,
   bodyLarge: 17,
   body: 16,
   bodySmall: 14,
@@ -67,10 +67,10 @@ export const type = {
 } as const;
 
 export const lineHeight = {
-  display: 43,
-  h1: 37,
-  h2: 30,
-  h3: 25,
+  display: 48,
+  h1: 40,
+  h2: 29,
+  h3: 24,
   body: 25,
   bodySmall: 22,
   compact: 21,
@@ -80,9 +80,9 @@ export const lineHeight = {
 } as const;
 
 export const tracking = {
-  display: -1,
-  h2: -0.4,
-  h3: -0.2,
+  display: -1.2,
+  h2: -0.35,
+  h3: -0.15,
   brand: -0.3,
   label: 0.6,
   mono: 0.5,
@@ -138,16 +138,20 @@ export const motion = {
   pressScale: 0.985,
 } as const;
 
+export const surfaceDepth: ViewStyle = {
+  boxShadow: "0 1px 1px rgba(31, 29, 27, 0.02), 0 2px 4px rgba(31, 29, 27, 0.025), 0 8px 24px rgba(31, 29, 27, 0.035), 0 20px 48px rgba(31, 29, 27, 0.025)",
+};
+
 export const fonts = {
   body: Platform.select({
-    ios: "Avenir Next",
-    web: "Avenir Next, Apple SD Gothic Neo, Noto Sans KR, ui-rounded, sans-serif",
+    ios: "SF Pro Text",
+    web: "SF Pro Text, Segoe UI, Apple SD Gothic Neo, Noto Sans KR, sans-serif",
     default: "sans-serif",
   }),
   mono: Platform.select({
-    ios: "SFMono-Regular",
-    web: "SFMono-Regular, Cascadia Code, Roboto Mono, ui-monospace, monospace",
-    default: "monospace",
+    ios: "SF Pro Text",
+    web: "SF Pro Text, Segoe UI, Apple SD Gothic Neo, Noto Sans KR, sans-serif",
+    default: "sans-serif",
   }),
 } as const;
 

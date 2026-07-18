@@ -5,15 +5,15 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: {
-    default: "LeaseFlow Data Admin",
+    default: "LeaseFlow 자산 운영",
     template: "%s · LeaseFlow",
   },
-  description: "Governed leasing-data publication workflow",
+  description: "임대 자산 정보와 주간 업무를 한곳에서 관리합니다.",
 };
 
 export const viewport: Viewport = {
-  colorScheme: "dark",
-  themeColor: "#070b0a",
+  colorScheme: "light",
+  themeColor: "#f5f3ef",
   width: "device-width",
   initialScale: 1,
 };
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     process.env.NEXT_PUBLIC_DISABLE_REACT_DEVTOOLS !== "1";
 
   return (
-    <html lang="en">
+    <html lang="ko">
       <head>
         {enableDevTools ? (
           <>
