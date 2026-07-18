@@ -2,21 +2,23 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod/v3";
 
+const SourceCandidateValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
 export const SourceCandidateSchema = z.object({
   building_id: z.string(),
   effective_date: z.string(),
   changes: z.array(z.object({
     field: z.string(),
     floor: z.string().nullable(),
-    previous_value: z.unknown(),
-    proposed_value: z.unknown(),
+    previous_value: SourceCandidateValueSchema,
+    proposed_value: SourceCandidateValueSchema,
     state: z.enum(["confirmed", "under_discussion", "unverified"]),
     external_shareable_candidate: z.boolean(),
     source_pointer: z.string(),
     confidence: z.number().min(0).max(1),
-  })),
-  unresolved: z.array(z.object({field: z.string(), question: z.string()})),
-});
+  }).strict()),
+  unresolved: z.array(z.object({field: z.string(), question: z.string()}).strict()),
+}).strict();
 
 export const RequestSchema = z.object({
   language: z.enum(["ko", "en", "mixed"]),

@@ -3,9 +3,12 @@ node_modules/
 .expo/
 dist/
 coverage/
+.omx/
 private-inputs/
 real-company-data/
 exports/
+data/demo/.runtime/
+*.tsbuildinfo
 *.pdf
 *.dwg
 *.xlsx

@@ -8,6 +8,8 @@ coverage/
 *.log
 .DS_Store
 .omx/
+data/demo/.runtime/
+*.tsbuildinfo
 .codegraph
 private-inputs/
 real-company-data/

@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { SourceCandidateSchema, createStructuredResponse } from "@leaseflow/ai";
+import { extractSyntheticSource } from "@/lib/source-extraction.server";
 
-export async function POST(request: Request) {
-  const body = await request.json();
-  if (process.env.DEMO_MODE === "true" && !process.env.OPENAI_API_KEY) {
-    return NextResponse.json({demo:true, building_id:"bld-cobalt", effective_date:"2026-07-18", changes:body.changes ?? [], unresolved:[]});
-  }
-  const result = await createStructuredResponse({
-    schema: SourceCandidateSchema,
-    schemaName: "leaseflow_source_candidate",
-    developer: "Extract candidate leasing-data changes. Never approve or publish. Include source pointers and unresolved items.",
-    user: JSON.stringify(body),
+export async function POST() {
+  const extraction = await extractSyntheticSource();
+  return NextResponse.json({
+    demo: extraction.mode === "credential_free_demo",
+    ...extraction.candidates,
   });
-  return NextResponse.json(result);
 }

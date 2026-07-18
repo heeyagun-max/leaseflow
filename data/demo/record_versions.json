@@ -6,9 +6,9 @@
     "marketed_area_py": 300,
     "status": "published",
     "valid_from": "2026-06-01",
-    "valid_to": "2026-07-17",
+    "valid_to": null,
     "version_no": 1,
-    "superseded": true,
+    "superseded": false,
     "external_shareable": true
   },
   {
@@ -30,9 +30,9 @@
     "value": 3,
     "status": "published",
     "valid_from": "2026-06-01",
-    "valid_to": "2026-07-17",
+    "valid_to": null,
     "version_no": 1,
-    "superseded": true,
+    "superseded": false,
     "external_shareable": true
   },
   {
@@ -54,9 +54,9 @@
     "value": 3,
     "status": "published",
     "valid_from": "2026-06-01",
-    "valid_to": "2026-07-17",
+    "valid_to": null,
     "version_no": 1,
-    "superseded": true,
+    "superseded": false,
     "external_shareable": true
   },
   {
