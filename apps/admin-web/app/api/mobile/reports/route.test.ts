@@ -1,0 +1,139 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { demoExtractionResult } from "@leaseflow/demo-data";
+import { DemoFileStore } from "@/lib/demo-store.server";
+import { GET, OPTIONS, POST } from "./route";
+
+const tempDirectories: string[] = [];
+
+async function publishedFixture() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "leaseflow-report-route-"));
+  tempDirectories.push(directory);
+  const statePath = path.join(directory, "state.json");
+  vi.stubEnv("DEMO_MODE", "true");
+  vi.stubEnv("LEASEFLOW_DEMO_STATE_PATH", statePath);
+  const store = new DemoFileStore(statePath);
+  const extracted = await store.extract(
+    { actor_id: "usr-junior", expected_revision: 0, occurred_at: "2026-07-18T09:00:00.000Z" },
+    demoExtractionResult,
+  );
+  const confirmed = await store.confirm({
+    actor_id: "usr-junior",
+    expected_revision: extracted.revision,
+    occurred_at: "2026-07-18T09:01:00.000Z",
+  });
+  return store.publish({
+    actor_id: "usr-senior",
+    expected_revision: confirmed.revision,
+    occurred_at: "2026-07-18T09:02:00.000Z",
+  });
+}
+
+function action(body: unknown) {
+  return POST(new Request("http://localhost/api/mobile/reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+}
+
+function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    for (const item of value) collectKeys(item, keys);
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      keys.add(key);
+      collectKeys(item, keys);
+    }
+  }
+  return keys;
+}
+
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+});
+
+describe.sequential("weekly report mobile route", () => {
+  it("fails closed outside explicit demo mode", async () => {
+    vi.stubEnv("DEMO_MODE", "false");
+    const response = await GET();
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "DEMO_DISABLED" });
+  });
+
+  it("provides CORS preflight without exposing state", async () => {
+    const response = await OPTIONS();
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-methods")).toBe("GET,POST,OPTIONS");
+  });
+
+  it("rejects unknown commands, unknown actions, and extra keys", async () => {
+    vi.stubEnv("DEMO_MODE", "true");
+    const invalidBodies = [
+      { action: "investigate", actor_id: "usr-manager", expected_revision: 0, report_id: "report-1", command: "아무거나 업데이트 해" },
+      { action: "erase", actor_id: "usr-manager", expected_revision: 0 },
+      { action: "draft", actor_id: "usr-manager", expected_revision: 0, extra: true },
+    ];
+    for (const body of invalidBodies) {
+      const response = await action(body);
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ code: "INVALID_REQUEST" });
+    }
+  });
+
+  it("dispatches the governed report lifecycle while exposing only the curated report DTO", async () => {
+    const published = await publishedFixture();
+    const draftedResponse = await action({
+      action: "draft", actor_id: "usr-manager", expected_revision: published.revision,
+    });
+    expect(draftedResponse.status).toBe(200);
+    expect(draftedResponse.headers.get("cache-control")).toBe("no-store");
+    const drafted = await draftedResponse.json() as { revision: number; reports: Array<{ id: string }> };
+    const reportId = drafted.reports[0]!.id;
+
+    const investigatedResponse = await action({
+      action: "investigate",
+      actor_id: "usr-manager",
+      expected_revision: drafted.revision,
+      report_id: reportId,
+      command: "이메일 확인해서 이번주 변동사항 업데이트 해",
+    });
+    expect(investigatedResponse.status).toBe(200);
+    const investigated = await investigatedResponse.json() as { revision: number };
+
+    const decidedResponse = await action({
+      action: "decide_patch",
+      actor_id: "usr-manager",
+      expected_revision: investigated.revision,
+      report_id: reportId,
+      decision: "reject",
+    });
+    expect(decidedResponse.status).toBe(200);
+    const decided = await decidedResponse.json() as { revision: number };
+
+    const approvedResponse = await action({
+      action: "approve", actor_id: "usr-manager", expected_revision: decided.revision, report_id: reportId,
+    });
+    expect(approvedResponse.status).toBe(200);
+    const approved = await approvedResponse.json() as { revision: number };
+
+    const sentResponse = await action({
+      action: "send", actor_id: "usr-manager", expected_revision: approved.revision,
+      report_id: reportId, idempotency_key: "weekly-route-send-1",
+    });
+    expect(sentResponse.status).toBe(200);
+    const sent = await sentResponse.json() as unknown;
+    const forbiddenKeys = ["actor_id", "approved_by", "idempotency_key", "raw_text", "protected_snapshot", "metadata"];
+    expect([...collectKeys(sent)].filter((key) => forbiddenKeys.includes(key))).toEqual([]);
+    expect(JSON.stringify(sent)).not.toContain("mail-002");
+
+    const getResponse = await GET();
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.get("cache-control")).toBe("no-store");
+    const current = await getResponse.json() as unknown;
+    expect([...collectKeys(current)].filter((key) => forbiddenKeys.includes(key))).toEqual([]);
+  });
+});
