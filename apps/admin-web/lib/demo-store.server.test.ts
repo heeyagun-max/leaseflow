@@ -194,7 +194,10 @@ describe("persistent governed demo store", () => {
     expect({ records: reloaded.records, files: reloaded.files, stage: reloaded.stage, candidates: reloaded.candidates }).toEqual(officialBefore);
     const reset = await store.reset({ actor_id: "usr-manager", expected_revision: reloaded.revision, occurred_at: "2026-07-18T12:00:00.000Z" });
     expect(reset.revision).toBe(reloaded.revision + 1);
-    expect(reset.operations).toEqual({ requests: [], packages: [], activities: [], audit: [] });
+    expect(reset.operations).toEqual({
+      requests: [], packages: [], activities: [], audit: [],
+      reports: { reports: [], activities: [], audit: [] },
+    });
     expect(reset.audit.at(-1)?.event_type).toBe("demo.reset");
   });
 

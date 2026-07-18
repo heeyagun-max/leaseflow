@@ -3,19 +3,31 @@ import path from "node:path";
 import { SourceCandidateSchema } from "@leaseflow/ai";
 import {
   approveOperationalPackage,
+  approveWeeklyReport,
   assertOperationalPackageContentIntegrity,
   assertGovernedPublicationStateInvariants,
+  assertWeeklyReportIntegrity,
   confirmCandidates,
   confirmOperationalRequest,
+  createInitialWeeklyReportState,
+  createWeeklyReportDraft,
   decidePackageEdit,
+  decideWeeklyReportPatch,
   draftOperationalPackage,
   importOperationalRequest,
+  markWeeklyReportStale,
   proposePackageEdit,
+  proposeWeeklyReportPatch,
   publishConfirmedBatch,
   recordExtraction,
+  sendWeeklyReport,
   sendOperationalPackage,
+  type CreateWeeklyReportDraftInput,
+  type OperationalState,
   type OperationalRequestExtraction,
   type UserRole,
+  type WeeklyReportPatchCandidate,
+  type WeeklyReportState,
 } from "@leaseflow/domain";
 import {
   createDemoDraftMaterial,
@@ -23,9 +35,12 @@ import {
   currentDemoMaterialVersionIds,
   demoUsers,
   mapSourceCandidatesToDomain,
+  migrateDemoStateToV3,
   type DemoState,
+  type LegacyDemoStateV2,
 } from "@leaseflow/demo-data";
 import { z } from "zod/v3";
+import { loadCanonicalWeeklyReportDraft } from "./mock-outlook.server";
 
 export class RevisionConflictError extends Error {
   constructor(readonly expected: number, readonly actual: number) {
@@ -36,6 +51,12 @@ export class RevisionConflictError extends Error {
 export class DemoStateCorruptError extends Error {
   constructor(message: string) {
     super(`Demo state is corrupt; refusing to continue: ${message}`);
+  }
+}
+
+export class WeeklyReportStaleError extends Error {
+  constructor(readonly currentRevision: number) {
+    super(`Weekly report inputs became stale; reload revision ${currentRevision} before continuing.`);
   }
 }
 
@@ -58,17 +79,45 @@ const recipientConfigSchema = z.object({
 export interface DemoRuntimeConfiguration {
   access: z.infer<typeof buildingAccessConfigSchema>;
   recipients: z.infer<typeof recipientConfigSchema>;
+  reportRecipients?: ConfiguredReportRecipientGroup;
+}
+
+const reportRecipientSchema = z.object({
+  configuration_id: z.string().min(1),
+  building_id: z.string().min(1),
+  to: z.array(z.object({
+    name: z.string().min(1).optional(), email: z.string().email(), role: z.literal("to_landlord_practical"),
+  }).strict()).length(1),
+  cc: z.array(z.object({
+    name: z.string().min(1).optional(), email: z.string().email(),
+    role: z.enum(["cc_landlord_team", "cc_landlord_exec", "cc_lm_team", "cc_lm_exec"]),
+  }).strict()).length(4),
+}).strict();
+
+export interface ConfiguredReportRecipientGroup {
+  configuration_id: string;
+  building_id: string;
+  to: Array<{ email: string; role: string }>;
+  cc: Array<{ email: string; role: string }>;
 }
 
 export async function loadDemoRuntimeConfiguration(): Promise<DemoRuntimeConfiguration> {
   const dataDirectory = path.dirname(path.dirname(defaultStorePath()));
-  const [accessRaw, recipientsRaw] = await Promise.all([
+  const [accessRaw, recipientsRaw, reportRecipientsRaw] = await Promise.all([
     readFile(path.join(dataDirectory, "building_access.json"), "utf8"),
     readFile(path.join(dataDirectory, "broker_package_recipient_group.json"), "utf8"),
+    readFile(path.join(dataDirectory, "recipient_group.json"), "utf8"),
   ]);
+  const reportRecipients = reportRecipientSchema.parse(JSON.parse(reportRecipientsRaw));
   return {
     access: buildingAccessConfigSchema.parse(JSON.parse(accessRaw)),
     recipients: recipientConfigSchema.parse(JSON.parse(recipientsRaw)),
+    reportRecipients: {
+      configuration_id: reportRecipients.configuration_id,
+      building_id: reportRecipients.building_id,
+      to: reportRecipients.to.map(({ email, role }) => ({ email, role })),
+      cc: reportRecipients.cc.map(({ email, role }) => ({ email, role })),
+    },
   };
 }
 const publicationStatusSchema = z.enum([
@@ -148,6 +197,97 @@ const packageFactSchema = z.object({
   unit: z.enum(["py", "months", "spaces"]), version_id: z.string(), source_pointer: z.string(),
 }).strict();
 const packageFileSchema = z.object({ requested_file: z.literal("current_floor_plan"), filename: z.string(), version_id: z.string(), source_pointer: z.string() }).strict();
+const reportPeriodSchema = z.object({ from: dateSchema, to: dateSchema }).strict();
+const reportNextActionSchema = z.object({
+  action: z.string().min(1), owner: z.string().min(1), due_date: dateSchema,
+}).strict();
+const reportSectionsSchema = z.object({
+  key_issue: z.string(),
+  changes_since_last_report: z.array(z.string()),
+  activity_summary: z.array(z.string()),
+  negotiated_area_floor_changes: z.array(z.string()),
+  competitor_buildings: z.array(z.string()),
+  blocker_and_pending_approval: z.array(z.string()),
+  next_actions: z.array(reportNextActionSchema),
+}).strict();
+const reportSourceSchema = z.object({
+  id: z.string().min(1), source_type: z.string().min(1), building_id: z.string().min(1),
+  occurred_at: z.string().datetime({ offset: true }), share_scope: z.literal("external_reportable"),
+  summary: z.string().min(1),
+}).strict();
+const reportAttachmentSchema = z.object({
+  id: z.string().min(1), building_id: z.string().min(1), version_id: z.string().min(1), filename: z.string().min(1),
+}).strict();
+const reportRecipientsSchema = z.object({
+  configuration_id: z.string().min(1),
+  to: z.array(z.object({ email: z.string().email(), role: z.string().min(1) }).strict()).min(1),
+  cc: z.array(z.object({ email: z.string().email(), role: z.string().min(1) }).strict()).min(1),
+}).strict();
+const reportCoverSchema = z.object({ subject: z.string().min(1), body: z.string().min(1) }).strict();
+const reportValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  z.array(reportNextActionSchema),
+]);
+const reportPatchCandidateSchema = z.object({
+  id: z.string().min(1),
+  command: z.enum([
+    "통화내용 확인해서 이번주 변동사항 업데이트 해",
+    "이메일 확인해서 이번주 변동사항 업데이트 해",
+    "협의 중인 면적 변동 있는지 확인해",
+    "협의 중인 층 변동 있는지 확인해",
+    "메일이랑 전화 확인해서 경쟁빌딩 파악해봐",
+  ]),
+  target_building_ids: z.array(z.string().min(1)).length(1),
+  findings: z.array(z.object({
+    category: z.string().min(1), finding: z.string().min(1),
+    source_reference_ids: z.array(z.string().min(1)).min(1), confidence: z.number().finite().min(0).max(1),
+  }).strict()).min(1),
+  operations: z.array(z.object({
+    section: z.enum([
+      "key_issue", "changes_since_last_report", "activity_summary", "negotiated_area_floor_changes",
+      "competitor_buildings", "blocker_and_pending_approval", "next_actions",
+    ]),
+    operation: z.enum(["replace", "append", "remove", "reorder"]),
+    before: reportValueSchema, after: reportValueSchema,
+    source_reference_ids: z.array(z.string().min(1)).min(1),
+  }).strict()).min(1),
+  unresolved: z.array(z.object({ field: z.string().min(1), question: z.string().min(1) }).strict()),
+}).strict();
+const reportProtectedSnapshotSchema = z.object({
+  building_id: z.string().min(1), reporting_period: reportPeriodSchema,
+  recipients: reportRecipientsSchema, sources: z.array(reportSourceSchema).min(1),
+  attachments: z.array(reportAttachmentSchema), current_material_ids: z.array(z.string().min(1)).min(1),
+  cover: reportCoverSchema,
+}).strict();
+const weeklyReportSchema = z.object({
+  id: z.string().min(1), building_id: z.string().min(1), reporting_period: reportPeriodSchema,
+  status: z.enum(["draft", "patch_pending", "approved", "sent", "stale"]),
+  base_sections: reportSectionsSchema, current_sections: reportSectionsSchema,
+  pending_candidate: reportPatchCandidateSchema.nullable(),
+  accepted_patch_history: z.array(z.object({
+    candidate: reportPatchCandidateSchema, accepted_by: z.string().min(1), accepted_at: z.string().datetime(),
+  }).strict()),
+  sources: z.array(reportSourceSchema).min(1), attachments: z.array(reportAttachmentSchema),
+  current_material_ids: z.array(z.string().min(1)).min(1), recipients: reportRecipientsSchema,
+  cover: reportCoverSchema, unresolved: z.array(z.string()),
+  approval: z.object({ approved_by: z.string().min(1).nullable(), approved_at: z.string().datetime().nullable() }).strict(),
+  delivery: z.object({ sent_at: z.string().datetime().nullable(), idempotency_key: z.string().min(1).nullable() }).strict(),
+  protected_snapshot: reportProtectedSnapshotSchema,
+}).strict();
+const weeklyReportStateSchema = z.object({
+  reports: z.array(weeklyReportSchema),
+  activities: z.array(z.object({
+    id: z.string().min(1), event_type: z.literal("report.sent.sandbox"), report_id: z.string().min(1),
+    building_id: z.string().min(1), occurred_at: z.string().datetime(), summary: z.string().min(1),
+  }).strict()),
+  audit: z.array(z.object({
+    id: z.string().min(1),
+    event_type: z.enum(["report.drafted", "report.patch_proposed", "report.patch_accepted", "report.patch_rejected", "report.approved", "report.sent.sandbox", "report.marked_stale"]),
+    actor_id: z.string().min(1), actor_role: userRoleSchema, report_id: z.string().min(1),
+    occurred_at: z.string().datetime(), metadata: z.record(z.unknown()),
+  }).strict()),
+}).strict();
 const operationalStateSchema = z.object({
   requests: z.array(z.object({
     id: z.string(), source: z.enum(["call", "email"]), source_id: z.string(), raw_text: z.string(), extraction: requestExtractionSchema,
@@ -170,9 +310,10 @@ const operationalStateSchema = z.object({
     actor_id: z.string(), actor_role: userRoleSchema, entity_id: z.string(), occurred_at: z.string().datetime(),
     metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
   }).strict()),
+  reports: weeklyReportStateSchema,
 }).strict();
 const persistedDemoStateSchema = z.object({
-  schema_version: z.literal(2),
+  schema_version: z.literal(3),
   source_id: z.literal("src-cobalt-jul"),
   revision: z.number().int().nonnegative(),
   effective_date: dateSchema,
@@ -188,7 +329,9 @@ const persistedDemoStateSchema = z.object({
   operations: operationalStateSchema,
 }).strict();
 
-function assertOperationalStateInvariants(state: DemoState): void {
+export type DemoRuntimeState = DemoState;
+
+function assertOperationalStateInvariants(state: DemoRuntimeState): void {
   const unique = (values: readonly string[], label: string) => {
     if (new Set(values).size !== values.length) throw new Error(`duplicate ${label} id`);
   };
@@ -207,15 +350,41 @@ function assertOperationalStateInvariants(state: DemoState): void {
   for (const activity of state.operations.activities) {
     if (!packageIds.has(activity.package_id)) throw new Error(`activity ${activity.id} references a missing package`);
   }
+  unique(state.operations.reports.reports.map((item) => item.id), "weekly report");
+  unique(state.operations.reports.activities.map((item) => item.id), "weekly report activity");
+  unique(state.operations.reports.audit.map((item) => item.id), "weekly report audit");
+  const reportIds = new Set(state.operations.reports.reports.map((item) => item.id));
+  for (const report of state.operations.reports.reports) assertWeeklyReportIntegrity(report);
+  for (const activity of state.operations.reports.activities) {
+    if (!reportIds.has(activity.report_id)) throw new Error(`report activity ${activity.id} references a missing report`);
+  }
+  for (const event of state.operations.reports.audit) {
+    if (!reportIds.has(event.report_id)) throw new Error(`report audit ${event.id} references a missing report`);
+  }
 }
 
-function parsePersistedState(value: unknown): DemoState {
+function migratePersistedState(value: unknown): unknown {
+  const candidate = value as { schema_version?: unknown; operations?: unknown };
+  if (candidate?.schema_version === 1) {
+    return {
+      ...(value as Record<string, unknown>),
+      schema_version: 3,
+      operations: { requests: [], packages: [], activities: [], audit: [], reports: createInitialWeeklyReportState() },
+    };
+  }
+  if (candidate?.schema_version === 2) {
+    return migrateDemoStateToV3(value as LegacyDemoStateV2);
+  }
+  return value;
+}
+
+function runtimeSeed(): DemoRuntimeState {
+  return parsePersistedState(createInitialDemoState());
+}
+
+function parsePersistedState(value: unknown): DemoRuntimeState {
   try {
-    const candidate = value as { schema_version?: unknown };
-    const migrated = candidate?.schema_version === 1
-      ? { ...(value as Record<string, unknown>), schema_version: 2, operations: { requests: [], packages: [], activities: [], audit: [] } }
-      : value;
-    const state = persistedDemoStateSchema.parse(migrated) as DemoState;
+    const state = persistedDemoStateSchema.parse(migratePersistedState(value)) as DemoRuntimeState;
     assertGovernedPublicationStateInvariants(state);
     assertOperationalStateInvariants(state);
     return state;
@@ -250,26 +419,29 @@ async function withPathLock<T>(storePath: string, operation: () => Promise<T>): 
 export class DemoFileStore {
   readonly storePath: string;
   private readonly configLoader: () => Promise<DemoRuntimeConfiguration>;
+  private readonly reportDraftLoader: () => Promise<CreateWeeklyReportDraftInput>;
 
   constructor(
     storePath = process.env.LEASEFLOW_DEMO_STATE_PATH ?? defaultStorePath(),
     configLoader: () => Promise<DemoRuntimeConfiguration> = loadDemoRuntimeConfiguration,
+    reportDraftLoader: () => Promise<CreateWeeklyReportDraftInput> = loadCanonicalWeeklyReportDraft,
   ) {
     this.storePath = path.resolve(storePath);
     this.configLoader = configLoader;
+    this.reportDraftLoader = reportDraftLoader;
   }
 
-  async getState(): Promise<DemoState> {
+  async getState(): Promise<DemoRuntimeState> {
     return withPathLock(this.storePath, () => this.readOrInitialize());
   }
 
-  async reset(input: { actor_id: string; expected_revision: number; occurred_at?: string }): Promise<DemoState> {
+  async reset(input: { actor_id: string; expected_revision: number; occurred_at?: string }): Promise<DemoRuntimeState> {
     return withPathLock(this.storePath, async () => {
       const actor = this.resolveActor(input.actor_id);
       const current = await this.readOrInitialize();
       this.requireRevision(current, input.expected_revision);
-      const seed = createInitialDemoState();
-      const resetState: DemoState = {
+      const seed = runtimeSeed();
+      const resetState: DemoRuntimeState = {
         ...seed,
         revision: current.revision + 1,
         audit: [...current.audit, {
@@ -405,10 +577,157 @@ export class DemoFileStore {
         state.operations, input.package_id, input.idempotency_key, currentDemoMaterialVersionIds(state),
         this.resolveActor(input.actor_id), input.occurred_at ?? new Date().toISOString(),
       );
-      const next = { ...state, revision: state.revision + 1, operations };
+      const next: DemoRuntimeState = {
+        ...state,
+        revision: state.revision + 1,
+        operations: { ...operations, reports: state.operations.reports },
+      };
       this.assertOfficialProjectionUnchanged(state, next);
       await this.writeState(next);
       return next;
+    });
+  }
+
+  async draftWeeklyReport(input: {
+    actor_id: string;
+    expected_revision: number;
+    draft: CreateWeeklyReportDraftInput;
+    occurred_at?: string;
+  }): Promise<DemoRuntimeState> {
+    return this.mutateReport(input.expected_revision, async (state) => {
+      const [config, canonicalDraft] = await Promise.all([
+        this.configLoader(),
+        this.reportDraftLoader(),
+      ]);
+      if (state.stage !== "published") throw new Error("Weekly report drafting requires the Stage 2 published state.");
+      this.assertConfiguredAccess(config, input.actor_id, input.draft.building_id);
+      this.assertReportConfiguration(input.draft, config);
+      this.assertCanonicalWeeklyReportSources(input.draft.sources, canonicalDraft.sources);
+      return createWeeklyReportDraft(
+        state.operations.reports,
+        input.draft,
+        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+        this.resolveActor(input.actor_id),
+        input.occurred_at ?? new Date().toISOString(),
+      );
+    });
+  }
+
+  async proposeWeeklyReportPatch(input: {
+    actor_id: string;
+    expected_revision: number;
+    report_id: string;
+    candidate: WeeklyReportPatchCandidate;
+    occurred_at?: string;
+  }): Promise<DemoRuntimeState> {
+    return this.mutateReport(input.expected_revision, (state) => proposeWeeklyReportPatch(
+      state.operations.reports,
+      input.report_id,
+      input.candidate,
+      this.resolveActor(input.actor_id),
+      input.occurred_at ?? new Date().toISOString(),
+    ));
+  }
+
+  async decideWeeklyReportPatch(input: {
+    actor_id: string;
+    expected_revision: number;
+    report_id: string;
+    decision: "accept" | "reject";
+    occurred_at?: string;
+  }): Promise<DemoRuntimeState> {
+    return this.mutateReport(input.expected_revision, (state) => decideWeeklyReportPatch(
+      state.operations.reports,
+      input.report_id,
+      input.decision,
+      this.resolveActor(input.actor_id),
+      input.occurred_at ?? new Date().toISOString(),
+    ));
+  }
+
+  async approveWeeklyReport(input: {
+    actor_id: string;
+    expected_revision: number;
+    report_id: string;
+    occurred_at?: string;
+  }): Promise<DemoRuntimeState> {
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      const report = this.requireWeeklyReport(state, input.report_id);
+      const [config, canonicalDraft] = await Promise.all([
+        this.configLoader(),
+        this.reportDraftLoader(),
+      ]);
+      this.assertConfiguredAccess(config, input.actor_id, report.building_id);
+      this.requireRevision(state, input.expected_revision);
+      const actor = this.resolveActor(input.actor_id);
+      const occurredAt = input.occurred_at ?? new Date().toISOString();
+      const currentReports = this.markReportStaleForCurrentInputs(
+        state,
+        input.report_id,
+        config,
+        canonicalDraft,
+        actor,
+        occurredAt,
+      );
+      if (currentReports !== state.operations.reports) {
+        await this.persistReportMutation(state, currentReports);
+        throw new WeeklyReportStaleError(state.revision + 1);
+      }
+      const reports = approveWeeklyReport(
+        state.operations.reports,
+        input.report_id,
+        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+        this.requireReportConfiguration(config).configuration_id,
+        actor,
+        occurredAt,
+      );
+      return this.persistReportMutation(state, reports);
+    });
+  }
+
+  async sendWeeklyReport(input: {
+    actor_id: string;
+    expected_revision: number;
+    report_id: string;
+    idempotency_key: string;
+    occurred_at?: string;
+  }): Promise<DemoRuntimeState> {
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      const report = this.requireWeeklyReport(state, input.report_id);
+      const [config, canonicalDraft] = await Promise.all([
+        this.configLoader(),
+        this.reportDraftLoader(),
+      ]);
+      this.assertConfiguredAccess(config, input.actor_id, report.building_id);
+      assertWeeklyReportIntegrity(report);
+      if (report.status === "sent" && report.delivery.idempotency_key === input.idempotency_key) return state;
+      this.requireRevision(state, input.expected_revision);
+      const actor = this.resolveActor(input.actor_id);
+      const occurredAt = input.occurred_at ?? new Date().toISOString();
+      const currentReports = this.markReportStaleForCurrentInputs(
+        state,
+        input.report_id,
+        config,
+        canonicalDraft,
+        actor,
+        occurredAt,
+      );
+      if (currentReports !== state.operations.reports) {
+        await this.persistReportMutation(state, currentReports);
+        throw new WeeklyReportStaleError(state.revision + 1);
+      }
+      const reports = sendWeeklyReport(
+        state.operations.reports,
+        input.report_id,
+        input.idempotency_key,
+        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+        this.requireReportConfiguration(config).configuration_id,
+        actor,
+        occurredAt,
+      );
+      return this.persistReportMutation(state, reports);
     });
   }
 
@@ -425,6 +744,92 @@ export class DemoFileStore {
     }
   }
 
+  private requireReportConfiguration(config: DemoRuntimeConfiguration): ConfiguredReportRecipientGroup {
+    if (!config.reportRecipients) throw new Error("No configured weekly-report recipient group is available.");
+    return config.reportRecipients;
+  }
+
+  private assertReportConfiguration(draft: CreateWeeklyReportDraftInput, config: DemoRuntimeConfiguration): void {
+    const current = this.requireReportConfiguration(config);
+    if (draft.building_id !== current.building_id
+      || draft.recipients.configuration_id !== current.configuration_id
+      || JSON.stringify(draft.recipients.to) !== JSON.stringify(current.to)
+      || JSON.stringify(draft.recipients.cc) !== JSON.stringify(current.cc)) {
+      throw new Error("Weekly-report recipients diverged from the current exact configured group.");
+    }
+  }
+
+  private requireWeeklyReport(state: DemoRuntimeState, reportId: string) {
+    const report = state.operations.reports.reports.find((item) => item.id === reportId);
+    if (!report) throw new Error(`Unknown weekly report: ${reportId}.`);
+    return report;
+  }
+
+  private currentWeeklyReportMaterialIds(
+    state: DemoRuntimeState,
+    canonicalDraft: CreateWeeklyReportDraftInput,
+  ): Set<string> {
+    const canonicalSourceIds = canonicalDraft.sources.map((source) => source.id);
+    return new Set([...currentDemoMaterialVersionIds(state), ...canonicalSourceIds]);
+  }
+
+  private assertCanonicalWeeklyReportSources(
+    sources: WeeklyReportState["reports"][number]["sources"],
+    canonical: WeeklyReportState["reports"][number]["sources"],
+  ): void {
+    const normalized = (items: typeof sources) => [...items]
+      .map((source) => ({ ...source }))
+      .sort((left, right) => left.id.localeCompare(right.id) || JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    if (JSON.stringify(normalized(sources)) !== JSON.stringify(normalized(canonical))) {
+      throw new Error("Weekly-report sources diverged from the canonical current synthetic source set.");
+    }
+  }
+
+  private markReportStaleForCurrentInputs(
+    state: DemoRuntimeState,
+    reportId: string,
+    config: DemoRuntimeConfiguration,
+    canonicalDraft: CreateWeeklyReportDraftInput,
+    actor: { id: string; role: UserRole },
+    occurredAt: string,
+  ): WeeklyReportState {
+    const currentRecipients = config.reportRecipients;
+    const currentRecipientConfigurationId = currentRecipients?.configuration_id
+      ?? "missing-weekly-report-recipient-configuration";
+    return markWeeklyReportStale(
+      state.operations.reports,
+      reportId,
+      this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+      currentRecipientConfigurationId,
+      actor,
+      occurredAt,
+      {
+        current_sources: canonicalDraft.sources,
+        ...(currentRecipients ? {
+          current_recipients: {
+            configuration_id: currentRecipients.configuration_id,
+            to: currentRecipients.to,
+            cc: currentRecipients.cc,
+          },
+        } : { recipient_content_drift: true }),
+      },
+    );
+  }
+
+  private async persistReportMutation(
+    state: DemoRuntimeState,
+    reports: WeeklyReportState,
+  ): Promise<DemoRuntimeState> {
+    const next: DemoRuntimeState = {
+      ...state,
+      revision: state.revision + 1,
+      operations: { ...state.operations, reports },
+    };
+    this.assertOfficialProjectionUnchanged(state, next);
+    await this.writeState(next);
+    return next;
+  }
+
   private assertPackageConfiguration(state: DemoState, packageId: string, config: DemoRuntimeConfiguration): void {
     const pkg = state.operations.packages.find((item) => item.id === packageId);
     if (!pkg) throw new Error(`Unknown package: ${packageId}.`);
@@ -436,7 +841,7 @@ export class DemoFileStore {
     }
   }
 
-  private async mutate(expectedRevision: number, command: (state: DemoState) => DemoState): Promise<DemoState> {
+  private async mutate(expectedRevision: number, command: (state: DemoRuntimeState) => DemoRuntimeState): Promise<DemoRuntimeState> {
     return withPathLock(this.storePath, async () => {
       const state = await this.readOrInitialize();
       this.requireRevision(state, expectedRevision);
@@ -448,19 +853,42 @@ export class DemoFileStore {
 
   private async mutateOperation(
     expectedRevision: number,
-    command: (state: DemoState) => DemoState["operations"],
-  ): Promise<DemoState> {
+    command: (state: DemoRuntimeState) => OperationalState,
+  ): Promise<DemoRuntimeState> {
     return withPathLock(this.storePath, async () => {
       const state = await this.readOrInitialize();
       this.requireRevision(state, expectedRevision);
-      const next: DemoState = { ...state, revision: state.revision + 1, operations: command(state) };
+      const operations = command(state);
+      const next: DemoRuntimeState = {
+        ...state,
+        revision: state.revision + 1,
+        operations: { ...operations, reports: state.operations.reports },
+      };
       this.assertOfficialProjectionUnchanged(state, next);
       await this.writeState(next);
       return next;
     });
   }
 
-  private assertPackageCanonicalMaterial(state: DemoState, packageId: string): void {
+  private async mutateReport(
+    expectedRevision: number,
+    command: (state: DemoRuntimeState) => WeeklyReportState | Promise<WeeklyReportState>,
+  ): Promise<DemoRuntimeState> {
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      this.requireRevision(state, expectedRevision);
+      const next: DemoRuntimeState = {
+        ...state,
+        revision: state.revision + 1,
+        operations: { ...state.operations, reports: await command(state) },
+      };
+      this.assertOfficialProjectionUnchanged(state, next);
+      await this.writeState(next);
+      return next;
+    });
+  }
+
+  private assertPackageCanonicalMaterial(state: DemoRuntimeState, packageId: string): void {
     const target = state.operations.packages.find((item) => item.id === packageId);
     if (!target) throw new Error(`Unknown package: ${packageId}.`);
     const request = state.operations.requests.find((item) => item.id === target.request_id);
@@ -484,8 +912,8 @@ export class DemoFileStore {
     }
   }
 
-  private assertOfficialProjectionUnchanged(before: DemoState, after: DemoState): void {
-    const project = (state: DemoState) => ({
+  private assertOfficialProjectionUnchanged(before: DemoRuntimeState, after: DemoRuntimeState): void {
+    const project = (state: DemoRuntimeState) => ({
       source_id: state.source_id, effective_date: state.effective_date, publication_scope: state.publication_scope,
       stage: state.stage, candidates: state.candidates, records: state.records, files: state.files, audit: state.audit,
     });
@@ -494,18 +922,22 @@ export class DemoFileStore {
     }
   }
 
-  private requireRevision(state: DemoState, expected: number): void {
+  private requireRevision(state: DemoRuntimeState, expected: number): void {
     if (state.revision !== expected) throw new RevisionConflictError(expected, state.revision);
   }
 
-  private async readOrInitialize(): Promise<DemoState> {
+  private async readOrInitialize(): Promise<DemoRuntimeState> {
     try {
       const raw = await readFile(this.storePath, "utf8");
       const parsed: unknown = JSON.parse(raw);
-      return parsePersistedState(parsed);
+      const shouldPersistMigration = (parsed as { schema_version?: unknown }).schema_version === 1
+        || (parsed as { schema_version?: unknown }).schema_version === 2;
+      const state = parsePersistedState(parsed);
+      if (shouldPersistMigration) await this.writeValidatedState(state);
+      return state;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        const initial = createInitialDemoState();
+        const initial = runtimeSeed();
         await this.writeState(initial);
         return initial;
       }
@@ -515,8 +947,12 @@ export class DemoFileStore {
     }
   }
 
-  private async writeState(state: DemoState): Promise<void> {
+  private async writeState(state: DemoRuntimeState): Promise<void> {
     const validated = parsePersistedState(state);
+    await this.writeValidatedState(validated);
+  }
+
+  private async writeValidatedState(validated: DemoRuntimeState): Promise<void> {
     const directory = path.dirname(this.storePath);
     await mkdir(directory, { recursive: true });
     const tempPath = `${this.storePath}.${process.pid}.${Date.now()}.tmp`;
