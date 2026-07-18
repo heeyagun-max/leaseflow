@@ -77,6 +77,130 @@
       "detail": "Runtime state and proprietary references were excluded from the staged release; staged-content gate passed"
     }
   ],
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "Changed-file cleanup completed after locking the reset conflict boundary with a 409 -> current_revision -> one-retry-success regression test first. The pass removed unreachable reset-script dead code, deleted the obsolete duplicate responsive CSS block while preserving the live source-caption rule, replaced chained status-tone ternaries with a small readable helper, and normalized the synthetic asset seed formatting without behavior changes. Post-cleaner evidence: 126 tests passed, the 13-route Admin production build passed, all five workspace typechecks passed, repository validation passed, and Admin browser QA at 375/768/1280 px found no horizontal overflow or console errors."
+  },
+  "verification": {
+    "status": "passed",
+    "commands": [
+      "npm test",
+      "npm run build -w @leaseflow/admin-web",
+      "npm run typecheck",
+      "npm run validate",
+      "cd apps/mobile && npx expo export --platform web --output-dir dist",
+      "swift scripts/demo-video/probe.swift artifacts/submission/LeaseFlow_Hackathon_Demo_KO.mp4",
+      "swift scripts/demo-video/verify-content.swift artifacts/submission/video-frames",
+      "git diff --check"
+    ],
+    "evidence": "Post-cleaner full rerun passed: 126 tests, five workspace typechecks, repository validation, Admin 13-route production build, Expo Web export, responsive Admin QA at 375/768/1280 px, final video probe/content verification, and diff whitespace validation."
+  },
+  "codeReview": {
+    "recommendation": "APPROVE",
+    "architectStatus": "CLEAR",
+    "evidence": "Independent final review found zero critical, high, medium, or low issues across 40 reviewed release files; the architecture review confirmed the governed source-to-publication-to-external-output boundaries and honest submission claims remain intact.",
+    "independentReview": {
+      "codeReviewer": {
+        "agentRole": "code-reviewer",
+        "evidence": "Agent /root/g006_final_code_review completed an independent final review and returned APPROVE with 0 issues across 40 files."
+      },
+      "architect": {
+        "agentRole": "architect",
+        "evidence": "Agent /root/g006_final_architecture_review completed an independent architecture-invariant review and returned CLEAR."
+      }
+    }
+  },
+  "architectureInvariantGate": {
+    "status": "passed",
+    "sourceArtifacts": [
+      ".omx/ultragoal/brief.md",
+      ".omx/ultragoal/goals.json",
+      "AGENTS.md"
+    ],
+    "evidence": "All required product and release invariants were proved against deterministic domain enforcement, focused tests, the staged-release scan, and distinct code-reviewer and architect reviews.",
+    "invariants": [
+      {
+        "invariant": "The repository and demo use synthetic data only.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/demo-data and the governed source-extraction route expose only the synthetic Cobalt demo dataset; proprietary reference files and runtime data are excluded from the staged release.",
+        "testEvidence": "Demo Data 11 tests, Admin source/extraction tests, the staged-content gate, and seven-frame OCR/content verification passed with synthetic markers and zero generic secret findings.",
+        "reviewEvidence": "The code-reviewer returned APPROVE and the architect returned CLEAR for the synthetic-only release boundary."
+      },
+      {
+        "invariant": "Communications cannot overwrite official property data.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/domain keeps operational package/report workflows separate from governed publication records; communication edits are represented as proposals and accepted workflow state rather than direct property-data mutation.",
+        "testEvidence": "Domain package-edit, operational-package, report-patch, integrity, and stale-state regressions passed within the 37 domain tests and related Admin/Mobile suites.",
+        "reviewEvidence": "Independent code and architecture reviews confirmed the communication-to-official-data boundary."
+      },
+      {
+        "invariant": "AI output remains a candidate, draft, or patch; OpenAI calls are server-side, use store:false, and are Zod-validated.",
+        "source": "AGENTS.md#non-negotiable-rules and AGENTS.md#engineering-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/ai defines Zod schemas for source candidates, requests, package edits, and report patches; its server adapter sets store:false, while domain functions require deterministic human decisions before acceptance.",
+        "testEvidence": "All 9 AI tests plus Admin extraction, package-edit, and report-patch tests passed.",
+        "reviewEvidence": "The code-reviewer approved and the architect cleared the AI proposal boundary and server-only adapter contract."
+      },
+      {
+        "invariant": "External projection selects only current, published, active, authorized, externally shareable records for the exact building.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/domain centralizes current publication and external-record selection in selectExternallyVisibleAssets, selectCurrentPublished, requireExternalRecord, and reportable-source selectors with building scope.",
+        "testEvidence": "Domain external-visibility, authorization, building-scope, package, and report tests passed, alongside Admin/Mobile API projection tests.",
+        "reviewEvidence": "The architect explicitly cleared the governed publication-to-external-output boundary; the code-reviewer reported no issues."
+      },
+      {
+        "invariant": "Floor plans and operational facts are versioned, and publication of a new current plan supersedes stale versions.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/domain models FileVersion and VersionedRecord, selects the current floor plan deterministically, publishes confirmed batches, and marks displaced governed assets superseded.",
+        "testEvidence": "Domain version-selection, supersession, stale-plan blocking, and governed publication tests passed; the Admin walkthrough showed the synthetic v2 current-plan transition.",
+        "reviewEvidence": "Independent architecture review returned CLEAR on versioning and stale-data prevention."
+      },
+      {
+        "invariant": "A Data Steward must confirm extracted candidates before a Senior can publish them.",
+        "source": ".omx/ultragoal/brief.md#governance-workflow",
+        "status": "proved",
+        "implementationEvidence": "packages/domain separates confirmSourceAsset/confirmCandidates from publishSourceAsset/publishConfirmedBatch and enforces role/action transitions; the Admin governance workspace exposes the same staged workflow.",
+        "testEvidence": "Domain role-transition and Admin source-governance route tests passed, including invalid transition rejection.",
+        "reviewEvidence": "Both independent reviewers confirmed the two-role publication gate is preserved."
+      },
+      {
+        "invariant": "Every external package and weekly building report requires human approval before delivery.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/domain separates draft/propose/decide/approve/send operations for operational packages and weekly reports; send gates require approved state.",
+        "testEvidence": "Operational package and weekly report approval/send-gating regressions passed in the Domain, Admin, and Mobile suites.",
+        "reviewEvidence": "The code-reviewer approved and the architect cleared the human approval boundary."
+      },
+      {
+        "invariant": "External To/Cc recipients come from configured building-specific recipient groups, never model invention.",
+        "source": "AGENTS.md#non-negotiable-rules",
+        "status": "proved",
+        "implementationEvidence": "packages/domain validates RecipientGroup and ConfiguredReportRecipients through deterministic recipient validation before package/report delivery.",
+        "testEvidence": "Recipient validation, building-specific weekly report, and send-gating tests passed.",
+        "reviewEvidence": "Independent architecture review returned CLEAR on configured recipient ownership."
+      },
+      {
+        "invariant": "Delivery remains sandbox-only and the submission makes no production Outlook, carrier-call, SSO, company-system, or public deployment claim.",
+        "source": "AGENTS.md#non-negotiable-rules and AGENTS.md#build-order",
+        "status": "proved",
+        "implementationEvidence": "DEMO_MODE and deterministic adapters provide local sandbox behavior; submission documentation labels real integrations and public URLs as pending rather than implemented.",
+        "testEvidence": "The verified credential-free demo path, repository validation, staged-content scan, and video content verification passed without external credentials or production sends.",
+        "reviewEvidence": "The code-reviewer and architect both accepted the sandbox boundary and claim accuracy."
+      },
+      {
+        "invariant": "Release staging excludes runtime state, proprietary reference material, secrets, and unverified external-completion claims.",
+        "source": ".omx/ultragoal/goals.json#G006-stage-6-submission-evidence-and-demo",
+        "status": "proved",
+        "implementationEvidence": ".omo workflow state, apps/admin-web/data runtime data, and docs/reference proprietary material are excluded; pending public URLs, /feedback capture, upload, and final submission remain explicitly unclaimed.",
+        "testEvidence": "The staged-release gate, generic secret scan, seven-frame OCR/content check, JSON parse, and git diff check passed.",
+        "reviewEvidence": "The final code-reviewer returned APPROVE and the architect returned CLEAR with release exclusions and submission honesty in scope."
+      }
+    ]
+  },
   "pendingExternalActions": [
     {
       "action": "Publish and record public Admin URL",
