@@ -10,9 +10,9 @@
 
 ## 1. Atmosphere & Identity
 
-LeaseFlow is a quiet, high-trust operations command center: near-black, precise, and calm enough for long review sessions, but rich enough to make governed state feel tangible. Its signature is the **governance bezel**—a thin emerald-tinted outer tray around a dark inner work surface, with a top rim light and a restrained radial “verification field.” The memorable moment is a workflow state moving from neutral graphite to verified emerald only after a human-controlled transition; green never decorates unverified content.
+LeaseFlow is a quiet, high-trust operations command center: near-black, precise, and calm enough for long review sessions, but rich enough to make governed state feel tangible. Its signature is the **governance bezel**—a thin emerald-tinted outer tray around a dark inner work surface, with a top rim light and a restrained verification border. The memorable moment is a workflow state moving from neutral graphite to verified emerald only after a human-controlled transition; green never decorates unverified content.
 
-The system combines Supabase's dark emerald identity, alpha-layered borders, regular-weight typography, and border-defined depth with the double-bezel material discipline from `soft-skill`. It intentionally avoids generic purple SaaS gradients, over-rounded card grids, heavy shadows, glass blur on scrolling content, and ornamental motion.
+The system combines Supabase's dark emerald identity, alpha-layered borders, regular-weight typography, and border-defined depth with the double-bezel material discipline from `soft-skill`. It intentionally avoids all gradients, over-rounded card grids, heavy shadows, glass blur on scrolling content, and ornamental motion.
 
 ### Design principles
 
@@ -20,7 +20,7 @@ The system combines Supabase's dark emerald identity, alpha-layered borders, reg
 2. **Green means governed.** Emerald signals a verified or primary interactive state, never unreviewed AI output.
 3. **Density with wayfinding.** Compact data is grouped by stage, provenance, and action so users do not need to remember hidden context.
 4. **One consequential action.** Each task region presents one visually dominant next action; destructive or irreversible actions are spatially separated.
-5. **Material restraint.** Depth comes from tonal surfaces, alpha borders, inset rim light, and one low-energy ambient glow—not blur piles or heavy drop shadows.
+5. **Material restraint.** Depth comes from tonal surfaces, alpha borders, and inset rim light—not gradients, blur piles, or heavy drop shadows.
 
 ## 2. Color
 
@@ -59,8 +59,7 @@ LeaseFlow is dark-mode native for this milestone. Semantic tokens are the only a
 | Error wash | `--lf-error-wash` | `rgba(253, 164, 175, 0.10)` | Error surface |
 | Info wash | `--lf-info-wash` | `rgba(147, 197, 253, 0.10)` | Info surface |
 | Scrim | `--lf-scrim` | `rgba(2, 7, 5, 0.72)` | Modal isolation only |
-| Atmosphere/emerald | `--lf-atmosphere-emerald` | `rgba(16, 185, 129, 0.13)` | Static upper-right page light field |
-| Atmosphere/cool | `--lf-atmosphere-cool` | `rgba(147, 197, 253, 0.06)` | Static lower-left balancing light field |
+| Atmosphere/emerald | `--lf-atmosphere-emerald` | `rgba(16, 185, 129, 0.13)` | Flat page-edge verification border |
 
 ### Color rules
 
@@ -230,6 +229,51 @@ The base unit is 4px.
 - **Motion:** none.
 - **Layout:** intrinsic grid using the overflow-safe track contract.
 
+### Mobile operations primitives
+
+The Expo operations surface ships a native counterpart to the web system. It uses the same semantic palette and governance model while keeping its geometry in `apps/mobile/src/styles/theme.ts`; controls, borders, line heights, tracking, icon sizes, copy limits, intrinsic floors, and responsive breakpoints must use those tokens rather than route-local numbers.
+
+#### `Mobile MetricCard`
+
+- **Structure:** tabular primary metric → visible operational label.
+- **Variants:** `neutral`, `info`, `warning`, `success`, `error`; meaning is always present in the label/value and never color alone.
+- **Layout:** intrinsic wrapping item with a tokenized 120px preferred floor, `minWidth: 0`, and a 100% maximum so four metrics collapse without horizontal scrolling.
+- **Contrast:** increased-contrast mode promotes the label to primary text and strengthens the existing one-pixel boundary without changing layout bounds.
+
+#### `Mobile DataRow`
+
+- **Structure:** mono source label → primary value → optional provenance/detail.
+- **Variants:** `neutral`, `candidate`, `verified`; candidate and verified remain explicit in surrounding workflow copy.
+- **Layout:** tokenized 220px preferred floor with `minWidth: 0`, wrapping values, and no intrinsic-width ownership. It is safe inside a 375px governance bezel.
+- **Contrast:** label, detail, and operational boundary are strengthened together under iOS high-text-contrast or web `prefers-contrast: more`.
+
+#### `Mobile WorkflowRail`
+
+- **Structure:** ordered collection of step rows; each row contains a numbered/state index plus label and visible state text.
+- **Variants:** `pending`, `current`, `complete`, `blocked`; the current and completed states retain text in addition to the state color/glyph.
+- **Layout:** steps wrap from their tokenized 148px preferred floor, then shrink safely with `minWidth: 0`; index geometry and row height use shared icon/control tokens.
+- **Contrast:** step boundary, index boundary, index text, label, and pending state text all strengthen as one contract. Semantic info/success/error colors remain intact.
+
+#### `Mobile MonoText`
+
+- **Structure:** selectable operational revision, identifier, or audit metadata text.
+- **Layout:** mono font, tabular numerals, tokenized data line height; the containing layout owns wrapping and width.
+- **Contrast:** secondary mono copy promotes to primary text in increased-contrast mode.
+
+#### `Mobile Divider`
+
+- **Structure:** noninteractive one-pixel operational boundary.
+- **Layout:** full available width with tokenized border thickness and vertical rhythm.
+- **Contrast:** subtle border color promotes to the strong text boundary color without increasing thickness or shifting content.
+
+#### Mobile adaptive contract
+
+- **375px / narrow:** workspace surfaces are content-sized, `width: 100%`, and never receive flex growth; nested command, data, feedback, and before/after regions use preferred flex bases plus `minWidth: 0` and `maxWidth: 100%`.
+- **700px / tablet:** copy sizing and status regions expand, metric spacing increases, and report command groups may use two intrinsic columns.
+- **1080px / wide:** request and report workspaces become equal flex siblings; flex behavior is applied only at this breakpoint.
+- **Reduced motion:** native `AccessibilityInfo.isReduceMotionEnabled()` removes press and hover transforms while retaining immediate border feedback and state copy.
+- **Increased contrast:** native high-text-contrast and web `prefers-contrast: more` strengthen nested text and boundaries across surfaces, metrics, data rows, workflow steps, feedback, mono metadata, and dividers. No component changes border thickness during the transition.
+
 ## 6. Motion & Interaction
 
 | Token | Duration | Curve | Usage |
@@ -252,14 +296,14 @@ Strategy: **mixed tonal-shift + alpha border + inset rim**, with no generic drop
 
 | Level | Recipe | Use |
 | --- | --- | --- |
-| Canvas | Deep canvas + two restrained radial light fields | Page atmosphere |
+| Canvas | Flat deep canvas + restrained top verification border | Page atmosphere |
 | Tray | `--lf-surface-0`, subtle outer border, 4px padding, XL radius | Governance bezel outer shell |
 | Work surface | `--lf-surface-1`, default border, inset top rim, LG radius | Primary panel core |
 | Raised state | `--lf-surface-2`, strong border, brighter rim | Hover, selected, nested control |
 | Governed state | Accent wash + accent border + emerald mark | Verified/approved/published only |
 
 - Backdrop blur is reserved for a future fixed overlay or fixed navigation surface. It is prohibited on scrolling panels.
-- The page atmosphere uses static radial gradients; it does not animate.
+- Gradients are prohibited. Page atmosphere and governed hierarchy use flat tokenized surfaces and borders.
 - No arbitrary `box-shadow`. The only permitted shadow is the inset rim recipe expressed as a tokenized system surface.
 - Large cards use concentric radii: 24px outer and 18px inner with a 4px tray gap.
 

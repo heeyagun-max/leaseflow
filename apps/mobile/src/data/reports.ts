@@ -104,6 +104,20 @@ export class ReportWorkflowHttpError extends Error {
   }
 }
 
+export function requiresReportWorkflowRefresh(
+  error: unknown,
+): error is ReportWorkflowHttpError {
+  return error instanceof ReportWorkflowHttpError
+    && (error.code === "REVISION_CONFLICT" || error.code === "WORKFLOW_STALE");
+}
+
+export function reportWorkflowRefreshRevision(error: unknown): number | null {
+  if (!requiresReportWorkflowRefresh(error)) return null;
+  return typeof error.currentRevision === "number" && Number.isInteger(error.currentRevision)
+    ? error.currentRevision
+    : null;
+}
+
 function endpoint(options: ReportWorkflowClientOptions): string {
   const baseUrl = (options.baseUrl
     ?? process.env.EXPO_PUBLIC_LEASEFLOW_API_URL

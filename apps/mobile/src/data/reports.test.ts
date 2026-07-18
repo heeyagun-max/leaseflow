@@ -3,6 +3,8 @@ import {
   ReportWorkflowHttpError,
   fetchMobileReports,
   mutateMobileReports,
+  reportWorkflowRefreshRevision,
+  requiresReportWorkflowRefresh,
   type MobileReportWorkflowView,
 } from "./reports";
 
@@ -92,5 +94,41 @@ describe("mobile weekly report HTTP adapter", () => {
       code: "REVISION_CONFLICT",
       currentRevision: 12,
     });
+  });
+
+  it("requires a refresh for stale and revision-conflict responses while preserving current_revision", async () => {
+    const staleFetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: "WORKFLOW_STALE",
+      error: "Weekly report sources changed",
+      current_revision: 15,
+    }), { status: 409 }));
+
+    let caught: unknown;
+    try {
+      await fetchMobileReports({ fetcher: staleFetcher });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(requiresReportWorkflowRefresh(caught)).toBe(true);
+    expect(caught).toMatchObject({
+      code: "WORKFLOW_STALE",
+      currentRevision: 15,
+    });
+    expect(reportWorkflowRefreshRevision(caught)).toBe(15);
+    expect(requiresReportWorkflowRefresh(new ReportWorkflowHttpError(409, {
+      code: "REVISION_CONFLICT",
+      error: "Revision conflict",
+      current_revision: 16,
+    }))).toBe(true);
+    expect(requiresReportWorkflowRefresh(new ReportWorkflowHttpError(409, {
+      code: "WORKFLOW_CONFLICT",
+      error: "Stage 2 publication is required",
+      current_revision: 15,
+    }))).toBe(false);
+    expect(reportWorkflowRefreshRevision(new ReportWorkflowHttpError(409, {
+      code: "WORKFLOW_STALE",
+      error: "Sources changed",
+    }))).toBeNull();
   });
 });
