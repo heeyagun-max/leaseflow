@@ -497,6 +497,10 @@ describe("weekly landlord report governance", () => {
       recipients.configuration_id,
       manager,
       "2026-07-18T03:04:00.000Z",
+      {
+        current_sources: [...draftInput.sources].reverse(),
+        current_recipients: { ...recipients, cc: [...recipients.cc].reverse() },
+      },
     )).toBe(approved);
     const stale = markWeeklyReportStale(
       approved,
@@ -510,7 +514,13 @@ describe("weekly landlord report governance", () => {
     expect(stale.reports[0]?.approval.approved_by).toBe("usr-manager");
     expect(stale.audit.at(-1)).toMatchObject({
       event_type: "report.marked_stale",
-      metadata: { material_drift: true, recipient_drift: true },
+      metadata: {
+        material_drift: true,
+        recipient_drift: true,
+        recipient_configuration_drift: true,
+        recipient_content_drift: false,
+        source_content_drift: false,
+      },
     });
     expect(() => sendWeeklyReport(
       stale,
@@ -521,6 +531,105 @@ describe("weekly landlord report governance", () => {
       manager,
       "2026-07-18T03:06:00.000Z",
     )).toThrow(/approval/);
+  });
+
+  it("marks a draft stale when canonical source content changes under the same source IDs", () => {
+    const draft = drafted();
+    const stale = markWeeklyReportStale(
+      draft,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:04:00.000Z",
+      {
+        current_sources: draftInput.sources.map((source) => source.id === "outlook-1"
+          ? { ...source, summary: "Tampered summary under the same source ID." }
+          : source),
+        current_recipients: recipients,
+      },
+    );
+    expect(stale.reports[0]?.status).toBe("stale");
+    expect(stale.audit.at(-1)).toMatchObject({
+      event_type: "report.marked_stale",
+      metadata: {
+        material_drift: false,
+        recipient_configuration_drift: false,
+        recipient_content_drift: false,
+        source_content_drift: true,
+      },
+    });
+  });
+
+  it("marks an approved report stale when recipient content changes under the same config ID", () => {
+    const approved = approveWeeklyReport(
+      drafted(),
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    );
+    const stale = markWeeklyReportStale(
+      approved,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:04:00.000Z",
+      {
+        current_sources: draftInput.sources,
+        current_recipients: {
+          ...recipients,
+          to: [{ ...recipients.to[0]!, email: "changed.manager@example.test" }],
+        },
+      },
+    );
+    expect(stale.reports[0]?.status).toBe("stale");
+    expect(stale.audit.at(-1)).toMatchObject({
+      event_type: "report.marked_stale",
+      metadata: {
+        material_drift: false,
+        recipient_configuration_drift: false,
+        recipient_content_drift: true,
+        source_content_drift: false,
+      },
+    });
+  });
+
+  it("keeps a sent report immutable even when canonical source and recipient content drift", () => {
+    const approved = approveWeeklyReport(
+      drafted(),
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:03:00.000Z",
+    );
+    const sent = sendWeeklyReport(
+      approved,
+      draftInput.id,
+      "immutable-send",
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:04:00.000Z",
+    );
+    expect(markWeeklyReportStale(
+      sent,
+      draftInput.id,
+      currentMaterialIds,
+      recipients.configuration_id,
+      manager,
+      "2026-07-18T03:05:00.000Z",
+      {
+        current_sources: draftInput.sources.map((source) => ({ ...source, summary: "changed" })),
+        current_recipients: {
+          ...recipients,
+          cc: recipients.cc.map((recipient) => ({ ...recipient, email: `changed.${recipient.email}` })),
+        },
+      },
+    )).toBe(sent);
   });
 });
 

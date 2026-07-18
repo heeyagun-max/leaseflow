@@ -1077,6 +1077,13 @@ export interface CreateWeeklyReportDraftInput {
   unresolved?: string[];
 }
 
+export interface WeeklyReportDriftEvidence {
+  current_sources?: readonly ReportSourceReference[];
+  current_recipients?: ConfiguredReportRecipients;
+  source_content_drift?: boolean;
+  recipient_content_drift?: boolean;
+}
+
 const WEEKLY_REPORT_SECTION_KEYS: ReadonlyArray<keyof WeeklyReportSections> = [
   "key_issue",
   "changes_since_last_report",
@@ -1620,14 +1627,37 @@ export function markWeeklyReportStale(
   currentRecipientConfigurationId: string,
   actor: { id: string; role: UserRole },
   occurredAt: string,
+  driftEvidence?: WeeklyReportDriftEvidence,
 ): WeeklyReportState {
   const target = state.reports.find((report) => report.id === reportId);
   if (!target) throw new Error(`Unknown weekly report: ${reportId}.`);
   assertWeeklyReportIntegrity(target);
   if (target.status === "sent" || target.status === "stale") return state;
   const materialDrift = target.current_material_ids.some((id) => !currentMaterialIds.has(id));
-  const recipientDrift = target.recipients.configuration_id !== currentRecipientConfigurationId;
-  if (!materialDrift && !recipientDrift) return state;
+  const recipientConfigurationDrift =
+    target.recipients.configuration_id !== currentRecipientConfigurationId;
+  const canonicalSources = (sources: readonly ReportSourceReference[]) =>
+    sources.map((source) => ({ ...source })).sort((left, right) =>
+      left.id.localeCompare(right.id) || JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  const canonicalRecipientContent = (recipients: ConfiguredReportRecipients) => {
+    const sortRecipients = (items: ConfiguredReportRecipients["to"]) =>
+      items.map((recipient) => structuredClone(recipient)).sort((left, right) =>
+        left.email.localeCompare(right.email)
+          || left.role.localeCompare(right.role)
+          || JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    return { to: sortRecipients(recipients.to), cc: sortRecipients(recipients.cc) };
+  };
+  const sourceContentDrift = Boolean(driftEvidence?.source_content_drift)
+    || (driftEvidence?.current_sources !== undefined
+      && !valuesEqual(canonicalSources(target.sources), canonicalSources(driftEvidence.current_sources)));
+  const recipientContentDrift = Boolean(driftEvidence?.recipient_content_drift)
+    || (driftEvidence?.current_recipients !== undefined
+      && !valuesEqual(
+        canonicalRecipientContent(target.recipients),
+        canonicalRecipientContent(driftEvidence.current_recipients),
+      ));
+  const recipientDrift = recipientConfigurationDrift || recipientContentDrift;
+  if (!materialDrift && !recipientDrift && !sourceContentDrift) return state;
   const nextReport: WeeklyReport = {
     ...target,
     status: "stale",
@@ -1643,7 +1673,13 @@ export function markWeeklyReportStale(
       actor_role: actor.role,
       report_id: reportId,
       occurred_at: occurredAt,
-      metadata: { material_drift: materialDrift, recipient_drift: recipientDrift },
+      metadata: {
+        material_drift: materialDrift,
+        recipient_drift: recipientDrift,
+        recipient_configuration_drift: recipientConfigurationDrift,
+        recipient_content_drift: recipientContentDrift,
+        source_content_drift: sourceContentDrift,
+      },
     })],
   };
 }
