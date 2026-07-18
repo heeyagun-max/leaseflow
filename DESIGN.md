@@ -128,6 +128,15 @@ Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
 - No outer tray, double bezel, neon rim, or nested card decoration.
 - Interactive states use border/color/opacity only. The surface never becomes a click target by accident.
 
+### Mobile work queue
+
+- Requests and weekly reports are lanes in one operating flow, not two dashboard cards. Only the selected lane is expanded.
+- The queue is the navigation and orientation layer: lane name, human status, and selection state. It never repeats the full task description.
+- Default selection follows work priority: stale or approved external material first, then items awaiting a decision, then drafts, then new work. A completed request yields to an unfinished weekly report.
+- The expanded lane contains one current outcome, the evidence needed for that decision, and its next permitted action. Later steps stay hidden until the state machine permits them.
+- On desktop the queue becomes a narrow rail beside the active work. On mobile it is a two-option tab row above the active work. Both use one shared surface rather than nested cards.
+- Current property information is reference material and follows the active work. It does not compete with the task queue or primary action.
+
 ### Action button
 
 - 44px minimum height, 9px radius, compact label, optional 16px trailing icon.
@@ -165,7 +174,10 @@ Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
 ## 6. Mobile product contract
 
 - Mobile uses the same warm palette and typography, adapted for touch and outdoor readability.
-- The opening view says “Today’s work” and surfaces requests and weekly reports. It does not describe publication policy.
+- The opening view is a task queue, not a marketing hero or dashboard summary. Its first viewport must contain the next permitted action.
+- The page title is 24–28px on mobile. Supporting copy is at most one short sentence and must never compete with the title.
+- Requests and weekly reports appear before reference data. The active task names the outcome and places its action directly below it.
+- Do not repeat the same workflow state in a hero, metric card, and task card. Do not show seeded or fallback counts when no actual task exists.
 - Current property information uses familiar labels: available area, rent-free, parking support, and floor plan.
 - Superseded files are silently excluded from packages. Mention them only in a relevant warning or history view.
 - Internal labels such as `CONTROL PLANE`, revision, audit events, fixture, candidate patch, and confidential enum values are prohibited.
