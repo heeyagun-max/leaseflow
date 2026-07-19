@@ -5,6 +5,7 @@ import {
   approveOperationalPackage,
   approveWeeklyReport,
   canPerform,
+  canPerformWeeklyReportAction,
   canSendExternal,
   confirmSourceAsset,
   confirmCandidates,
@@ -366,12 +367,15 @@ describe("weekly landlord report governance", () => {
   }
 
   it("defines explicit report permissions", () => {
-    expect(canPerform("lm_manager", "report.prepare")).toBe(true);
-    expect(canPerform("lm_manager", "report.approve")).toBe(true);
-    expect(canPerform("lm_manager", "report.send")).toBe(true);
-    expect(canPerform("lm_member", "report.prepare")).toBe(true);
-    expect(canPerform("lm_member", "report.approve")).toBe(false);
-    expect(canPerform("team_lead", "report.approve")).toBe(true);
+    expect(canPerformWeeklyReportAction("lm_manager", "report.prepare")).toBe(true);
+    expect(canPerformWeeklyReportAction("lm_manager", "report.approve")).toBe(true);
+    expect(canPerformWeeklyReportAction("lm_manager", "report.send")).toBe(true);
+    expect(canPerformWeeklyReportAction("lm_member", "report.prepare")).toBe(true);
+    expect(canPerformWeeklyReportAction("lm_member", "report.approve")).toBe(false);
+    expect(canPerformWeeklyReportAction("team_lead", "report.approve")).toBe(false);
+    expect(canPerformWeeklyReportAction("admin", "report.approve")).toBe(false);
+    expect(canPerform("lm_manager", "report.prepare")).toBe(false);
+    expect(canPerform("admin", "report.approve")).toBe(false);
   });
 
   it("pins all five commands and fails closed for legacy sources without share scope", () => {

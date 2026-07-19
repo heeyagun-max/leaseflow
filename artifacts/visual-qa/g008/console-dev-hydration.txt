@@ -1,0 +1,4 @@
+Surface: dev Chrome/CDP at http://127.0.0.1:3123/sources with React devtools disabled.
+Invocation: `agbrowse console --clear --reload --duration 3000 --limit 200`
+Observed: `[error] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties.`
+Diff excerpt: `<h1 tabindex="-1">` client vs server `<h1>`; stack points to `RouteFocus`/`PageHeader`.

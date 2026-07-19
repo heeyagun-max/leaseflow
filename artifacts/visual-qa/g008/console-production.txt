@@ -1,0 +1,3 @@
+Surface: production Chrome/CDP at http://127.0.0.1:3124/
+Invocation: `agbrowse console --clear --reload --duration 2000 --limit 100`
+Result: (no console output captured)

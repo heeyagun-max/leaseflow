@@ -36,4 +36,11 @@ describe("workflow error classification", () => {
       body: { code: "INTERNAL_ERROR", error: "The workflow could not be completed." },
     });
   });
+
+  it("does not expose actor or building identifiers in permission errors", () => {
+    expect(classifyWorkflowError(new Error("Demo user usr-senior is not authorized for building bld-cobalt."))).toEqual({
+      status: 403,
+      body: { code: "FORBIDDEN", error: "현재 역할로 이 작업을 수행할 수 없습니다." },
+    });
+  });
 });

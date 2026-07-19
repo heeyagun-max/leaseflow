@@ -33,7 +33,9 @@ export function classifyWorkflowError(error: unknown): WorkflowErrorResponse {
     || message.includes("Idempotency key is already assigned to another weekly report")) {
     return { status: 409, body: { code: "IDEMPOTENCY_CONFLICT", error: message } };
   }
-  if (message.includes("not allowed") || message.includes("not authorized")) return { status: 403, body: { code: "FORBIDDEN", error: message } };
+  if (message.includes("not allowed") || message.includes("not authorized")) {
+    return { status: 403, body: { code: "FORBIDDEN", error: "현재 역할로 이 작업을 수행할 수 없습니다." } };
+  }
   if (message.includes("stale") || message.includes("blocked") || message.includes("Only a") || message.includes("requires") || message.includes("diverged")) {
     return { status: 409, body: { code: "WORKFLOW_CONFLICT", error: message } };
   }

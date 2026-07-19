@@ -1,213 +1,267 @@
-# LeaseFlow Design System
+---
+name: LeaseFlow Quiet Evidence Ledger
+description: 출처가 있는 임대 운영 정보를 사람이 검토·승인·게시하는 고밀도 관리자 경험의 시각 기준본
+status: final
+updated: 2026-07-19
+sources:
+  - docs/PRODUCT_DIRECTION.md
+  - docs/WORKFLOWS.md
+  - docs/DATA_GOVERNANCE.md
+  - docs/design/LEASEFLOW_SERVICE_LAYER_AND_DESIGN_MANIFEST_v3.0.0_KO.md
+  - docs/design/LEASEFLOW_ADMIN_G008_DESIGN_READ_KO.md
+colors:
+  canvas: '#F7F4ED'
+  canvas-deep: '#ECE7DC'
+  surface: '#FFFEFB'
+  surface-subtle: '#F1EDE4'
+  surface-disabled: '#E9E5DC'
+  ink: '#23211F'
+  ink-secondary: '#625E57'
+  ink-disabled: '#827D75'
+  rail: '#132B3A'
+  rail-text: '#F7F4ED'
+  rail-muted: '#B8C6D0'
+  cobalt: '#1F5FAE'
+  cobalt-pressed: '#174A89'
+  cobalt-wash: '#E8F0FA'
+  focus-on-light: '#1F5FAE'
+  focus-on-rail: '#93C5FD'
+  border-subtle: '#E3DED4'
+  border-default: '#CBC4B7'
+  border-strong: '#8F877B'
+  success: '#246B45'
+  success-wash: '#E8F2EC'
+  warning: '#8A570F'
+  warning-wash: '#F8EDD8'
+  error: '#A73535'
+  error-wash: '#F8E7E5'
+  info: '#315F88'
+  info-wash: '#E7EFF5'
+typography:
+  page-title:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: 'clamp(24px, 2.2vw, 28px)'
+    fontWeight: '680'
+    lineHeight: '1.25'
+    letterSpacing: '-0.02em'
+  section-title:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: '20px'
+    fontWeight: '650'
+    lineHeight: '1.35'
+    letterSpacing: '-0.01em'
+  item-title:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: '15px'
+    fontWeight: '650'
+    lineHeight: '1.45'
+  body:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: '15px'
+    fontWeight: '430'
+    lineHeight: '1.6'
+  label:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: '13px'
+    fontWeight: '600'
+    lineHeight: '1.45'
+  data:
+    fontFamily: 'Pretendard Variable, Pretendard, sans-serif'
+    fontSize: '14px'
+    fontWeight: '480'
+    lineHeight: '1.5'
+rounded:
+  sm: 4px
+  md: 6px
+  lg: 8px
+  full: 9999px
+spacing:
+  '1': 4px
+  '2': 8px
+  '3': 12px
+  '4': 16px
+  '5': 20px
+  '6': 24px
+  '8': 32px
+  '10': 40px
+  '12': 48px
+  content-gutter-desktop: 32px
+  content-gutter-tablet: 24px
+  content-gutter-mobile: 16px
+components:
+  primary-action:
+    background: '{colors.cobalt}'
+    foreground: '#FFFFFF'
+    pressed: '{colors.cobalt-pressed}'
+    radius: '{rounded.md}'
+    minHeight: 44px
+  secondary-action:
+    background: '{colors.surface}'
+    foreground: '{colors.ink}'
+    border: '{colors.border-default}'
+    radius: '{rounded.md}'
+    minHeight: 44px
+  work-surface:
+    background: '{colors.surface}'
+    border: '{colors.border-subtle}'
+    radius: '{rounded.lg}'
+  evidence-row:
+    background: '{colors.surface}'
+    divider: '{colors.border-subtle}'
+    selected: '{colors.cobalt-wash}'
+  decision-rail:
+    background: '{colors.surface}'
+    border: '{colors.border-default}'
+    radius: '{rounded.lg}'
+  global-rail:
+    background: '{colors.rail}'
+    foreground: '{colors.rail-text}'
+    muted: '{colors.rail-muted}'
+    focus: '{colors.focus-on-rail}'
+---
 
-> v3.0.0 화면·서비스 계층의 상세 결정은 `docs/design/LEASEFLOW_SERVICE_LAYER_AND_DESIGN_MANIFEST_v3.0.0_KO.md`를 따른다. 이 문서와 충돌할 경우 v3.0.0 매니페스트를 우선한다.
+# LeaseFlow 디자인 기준본
 
-## 0. Research log
+`DESIGN.md`는 LeaseFlow 관리자 웹이 **어떻게 보여야 하는지**를 정의한다. 정보 구조, 행동, 상태, 접근성, 사용자 여정은 `EXPERIENCE.md`가 소유한다. 두 문서와 목업이 충돌하면 이 문서와 `EXPERIENCE.md`가 우선하며, 도메인·권한·게시 불변식은 `docs/DATA_GOVERNANCE.md`와 코드가 우선한다.
 
-- 2026-07-18 redesign: the owner rejected the shipped dark developer-console language and the exposure of internal policy copy. The new direction is a calm global knowledge-work product for office teams.
-- OMO frontend routing: existing-product redesign, then layout repair and perfection audit. Layer B references shortlisted Notion, Airtable, and Mastercard; Notion was selected for warm restraint and progressive disclosure. Airtable informed structured-data density only.
-- UI/UX database: generic real-estate teal, display-serif, and dashboard-card recommendations were rejected because they reduce Korean scan speed and create an AI-template look. A documentation/knowledge-base palette and plain-language interaction guidance were retained.
-- No product screenshots, brand layouts, or reference copy are reproduced. References inform hierarchy, density, and interaction grammar only.
+G008 설계 자료의 anchor형 IA·장문 페이지 진단과 77/77·146/146 검증치는 구현 당시의 역사적 감사 기록이다.
 
-## 1. Product atmosphere
+현재 구현은 `/`, `/sources`, `/changes`, `/publishing`, `/operations`, `/reports`, `/settings`의 7개 전역 route와 관련 로컬·상세 route에 이 기준을 적용한다. G009 이후 현재 최종 품질 판정은 `artifacts/visual-qa/g008/G008_FINAL_QA.md`가 소유한다.
 
-LeaseFlow is a quiet, precise workplace for people who review property information, coordinate decisions, and prepare external material. It should feel like a trusted operations ledger in a global enterprise: warm paper canvas, an ink-navy admin rail, crisp white work surfaces, strong typography, restrained blue actions, and clear editorial spacing.
+## Brand & Style
 
-The product is not a system console. The primary interface speaks about the user's work, not the implementation. Technical metadata exists only where it helps troubleshooting or review and is progressively disclosed.
+LeaseFlow의 시각 명제는 **Quiet Evidence Ledger / 조용한 증거 대장**이다. 이 제품은 부동산 홍보물이나 KPI 대시보드가 아니라, 출처가 있는 변화가 사람의 판단을 거쳐 공식 운영 정보가 되는 고위험 반복 업무 도구다. 화면은 사용자의 시선을 장식으로 끌지 않고 `업무 대기열 → 근거와 비교 → 결정`의 순서로 이동시킨다.
 
-### Principles
+디자인 다이얼은 다음 값으로 고정한다.
 
-1. **Work, not policy.** Lead with the task, its current state, and the next useful action.
-2. **Plain language.** Prefer “Review changes” over “candidate governance” and “Publish” over “server-authorized transition.”
-3. **One clear next step.** Each task region has one dominant action; secondary and destructive actions stay quiet.
-4. **Progressive disclosure.** IDs, version numbers, source references, and decision logs appear in secondary detail views, not page introductions.
-5. **Calm structure.** Hierarchy comes from spacing, type, alignment, and subtle borders—not neon color, nested bezels, or card decoration.
+| 다이얼 | 값 | 이유 |
+| --- | ---: | --- |
+| 구성 변이 | 3/10 | 페이지 종류가 달라도 반복 업무의 위치 기억을 보존한다. |
+| 모션 | 1/10 | 주의 환기보다 판단 안정성과 멀미 방지가 중요하다. |
+| 제품 밀도 | D6 | 표, 변경 전후, 출처, 결정 상태를 한 화면에서 교차 검토해야 한다. |
+| 시각 밀도 | 7/10 | 고밀도이되 구분선·행 간격·타입 계층으로 읽을 수 있어야 한다. |
 
-## 2. Color
+가장 기억에 남는 요소는 장식이 아니라 **증거선**이다. 선택한 대기열 항목과 근거 행, 비교 결과, 결정 레일을 2px 코발트 선과 같은 정렬축으로 연결한다. 선은 선택된 한 작업에만 나타나며, 프로세스 전체를 장식하지 않는다.
 
-Semantic tokens are the only color source in components.
+## Colors
 
-| Role | CSS token | Value | Usage |
-| --- | --- | --- | --- |
-| Canvas/deep | `--lf-canvas-deep` | `#ebe9e4` | Page edge and mobile browser surround |
-| Canvas | `--lf-canvas` | `#f7f6f3` | Primary page background |
-| Surface/base | `--lf-surface-0` | `#f0efeb` | Quiet grouped region |
-| Surface/primary | `--lf-surface-1` | `#ffffff` | Main work surface |
-| Surface/secondary | `--lf-surface-2` | `#f5f4f1` | Inputs, nested rows, secondary regions |
-| Surface/elevated | `--lf-surface-3` | `#eceae5` | Hover and selected state |
-| Surface/disabled | `--lf-surface-disabled` | `#f1f0ed` | Disabled controls |
-| Text/primary | `--lf-text-1` | `#23211f` | Headings and body |
-| Text/secondary | `--lf-text-2` | `#57534e` | Supporting copy |
-| Text/tertiary | `--lf-text-3` | `#6a655f` | Metadata |
-| Text/disabled | `--lf-text-disabled` | `#8c8780` | Disabled labels |
-| Border/subtle | `--lf-border-subtle` | `rgba(35, 33, 31, 0.07)` | Quiet division |
-| Border/default | `--lf-border` | `rgba(35, 33, 31, 0.11)` | Controls and panel edges |
-| Border/strong | `--lf-border-strong` | `rgba(35, 33, 31, 0.20)` | Active and hover boundary |
-| Rim light | `--lf-rim-light` | `rgba(255, 255, 255, 0.92)` | Subtle top highlight |
-| Accent/100 | `--lf-emerald-100` | `#e8f1fb` | Informational wash |
-| Accent/200 | `--lf-emerald-200` | `#cfe2f7` | Focus wash |
-| Accent/300 | `--lf-emerald-300` | `#76a9df` | Secondary accent |
-| Accent/400 | `--lf-emerald-400` | `#3f7fbd` | Focus and selected mark |
-| Accent/500 | `--lf-emerald-500` | `#2563a6` | Primary action |
-| Accent/700 | `--lf-emerald-700` | `#194b7d` | Pressed action |
-| Accent wash | `--lf-accent-wash` | `rgba(37, 99, 166, 0.08)` | Selected background |
-| Accent border | `--lf-accent-border` | `rgba(37, 99, 166, 0.30)` | Focus boundary |
-| Success | `--lf-success` | `#287a4b` | Completed state |
-| Warning | `--lf-warning` | `#9a5b14` | Attention state |
-| Error | `--lf-error` | `#b33a3a` | Error state |
-| Info | `--lf-info` | `#2d69a8` | Informational state |
-| Warning wash | `--lf-warning-wash` | `rgba(154, 91, 20, 0.08)` | Warning surface |
-| Error wash | `--lf-error-wash` | `rgba(179, 58, 58, 0.07)` | Error surface |
-| Info wash | `--lf-info-wash` | `rgba(45, 105, 168, 0.07)` | Info surface |
-| Scrim | `--lf-scrim` | `rgba(31, 29, 27, 0.42)` | Modal isolation only |
-| Atmosphere/accent | `--lf-atmosphere-emerald` | `rgba(37, 99, 166, 0.06)` | Compatibility token; never decorative |
+색은 역할이 하나씩만 있다.
 
-### Color rules
+- `{colors.canvas}`는 따뜻한 종이색 작업 바탕이다. 긴 검토에서 흰색 눈부심을 줄이되 질감 이미지나 노이즈를 넣지 않는다.
+- `{colors.rail}`은 전역 탐색 전용 잉크 레일이다. 본문이나 모달을 어둡게 만드는 다크 테마로 확장하지 않는다.
+- `{colors.cobalt}`는 현재 선택, 링크, 포커스, 현재 단계의 유일한 주 행동에만 사용한다. 넓은 장식 면이나 KPI 강조색으로 사용하지 않는다.
+- `{colors.success}`, `{colors.warning}`, `{colors.error}`, `{colors.info}`는 의미 상태에만 사용한다. 모든 상태에는 텍스트 또는 아이콘 라벨을 함께 둔다.
+- 중립 계층은 `{colors.border-subtle}` → `{colors.border-default}` → `{colors.border-strong}`과 `{colors.surface-subtle}` → `{colors.surface}`의 조합으로 만든다.
 
-- Body contrast targets WCAG 2.2 AA. Status never relies on color alone.
-- Blue is reserved for links, focus, selected navigation, and the primary action.
-- Green means completed or ready. Amber means attention. Neither decorates neutral content.
-- The admin sidebar may use `#173047` as a stable navigation anchor. Main work areas remain light.
-- No decorative gradients, dark console workspaces, luminous borders, or large tinted panels.
+검증 기준: 흰 글자와 `{colors.cobalt}`는 6.35:1, `{colors.focus-on-rail}`과 `{colors.rail}`은 8.12:1, `{colors.rail-text}`와 `{colors.rail}`은 13.33:1이다. 포커스 표시와 비텍스트 경계는 인접색 대비 3:1 이상이어야 한다.
 
-## 3. Typography and voice
+금지: 그라디언트, 글래스 블러, 네온, 보라색 AI 팔레트, 부동산 관습형 청록색, 장식용 상태색, 대형 색면 KPI.
 
-### Families
+## Typography
 
-- Primary: `"SF Pro Text", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`.
-- Data: the same family with tabular numerals. Monospace is limited to an explicitly opened technical detail.
-- No display serif, forced uppercase, or letter-spaced technical labels in primary product UI.
+전 화면은 하나의 refined grotesk 계열인 **Pretendard Variable**을 사용한다. 한국어와 숫자의 폭이 안정적이고, 고밀도 표에서 제목·본문·데이터를 굵기와 크기로만 분리할 수 있기 때문이다. Georgia, Cinzel, Josefin, display serif, 별도 monospace 표현은 사용자 화면에서 제거한다.
 
-### Scale
+- 페이지마다 `h1`은 하나이며 `{typography.page-title}`을 쓴다. 크기는 24–28px 범위를 넘지 않는다.
+- 업무 구역 제목은 `h2`와 `{typography.section-title}`, 항목 제목은 `h3`와 `{typography.item-title}`을 쓴다.
+- 시각 크기를 위해 헤딩 레벨을 건너뛰지 않는다. 작은 시각 제목이 필요하면 헤딩 레벨은 유지하고 토큰만 적용한다.
+- 숫자와 날짜는 같은 글꼴의 tabular numerals를 사용한다. 사용자 화면에 코드 글꼴로 내부성을 암시하지 않는다.
+- 영문 대문자 eyebrow, 숫자 접두 레이블, 과도한 자간은 쓰지 않는다. 한글 문장형 레이블을 사용한다.
 
-| Role | Size | Weight | Line-height | Usage |
-| --- | --- | --- | --- | --- |
-| Page title | `clamp(1.85rem, 3vw, 2.65rem)` | 650 | 1.14 | One task-oriented `h1` |
-| Section title | `1.35rem` | 620 | 1.3 | Major region |
-| Card title | `1rem` | 620 | 1.4 | Group title |
-| Body large | `1.0625rem` | 400 | 1.65 | Short introduction |
-| Body | `0.9375rem` | 400 | 1.6 | Default copy and controls |
-| Small | `0.8125rem` | 450 | 1.5 | Secondary metadata |
-| Label | `0.75rem` | 600 | 1.4 | Short sentence-case label |
+## Layout & Spacing
 
-### Content rules
+기본 단위는 4px이며 주요 간격은 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48px이다. 페이지의 공통 읽기 구조는 다음 세 영역이다.
 
-- Page copy answers: What is this? What needs attention? What can I do next?
-- Primary UI must not use: governed, control plane, server-side, adapter, mutation, optimistic concurrency, provenance, allowlisted, scoped patch, projection, sandbox-only, mock Outlook, or raw enum values.
-- Use human labels: “Review changes,” “Current information,” “Decision history,” “Demo email,” and “Approve and send.”
-- Show the demo boundary once per surface: “Demo data only. No email, phone, or sign-in connection.”
-- Avoid explaining authorization and publication rules unless the user opens help or a relevant error occurs.
-- Buttons start with a concrete verb. Success messages state the result and next step in one sentence.
+1. **Task queue** — 현재 처리할 작업을 행 중심으로 보여준다.
+2. **Evidence/comparison** — 원문, 출처, 현재값, 제안값을 같은 정렬축에서 비교한다.
+3. **Decision rail** — 현재 단계의 한 가지 주 행동, 인계 상태, 차단 원인과 복구를 둔다.
 
-## 4. Spacing and layout
+`≥1024px`에서는 `{components.global-rail}`을 232px 고정 열로 두고 본문을 `minmax(0, 1fr)`로 제한한다. 작업 본문은 필요에 따라 대기열 240–280px, 증거 영역 유동폭, 결정 레일 288–320px의 3열을 사용한다. `768–1023px`에서는 compact topbar와 drawer, 본문 1열 및 필요 시 우측 drawer형 결정 레일을 쓴다. `<768px`에서는 appbar와 drawer, 한 열 흐름을 사용한다. 전역 탐색은 어떤 폭에서도 가로 스크롤하지 않는다.
 
-Base unit is 4px. Standard gaps are 8, 12, 16, 24, 32, 48, and 64px.
+320px와 375px에서 콘텐츠가 뷰포트 폭을 넘지 않아야 한다. 200% 확대에서 본문은 한 방향으로만 스크롤해야 하며, 넓은 표는 열 우선순위를 줄인 행 목록 또는 정의 목록으로 전환한다. 2차원 스크롤을 정상 동작으로 간주하지 않는다.
 
-| Token | Value | Usage |
-| --- | --- | --- |
-| `--lf-content-max` | `1240px` | Admin content limiter |
-| `--lf-copy-max` | `62ch` | Prose measure |
-| `--lf-control-min` | `44px` | Minimum action target |
-| `--lf-row-compact` | `48px` | Dense row floor |
-| `--lf-radius-sm` | `6px` | Tags and small controls |
-| `--lf-radius-md` | `9px` | Buttons and inputs |
-| `--lf-radius-lg` | `12px` | Main work surface |
-| `--lf-radius-xl` | `16px` | Large grouped region |
-| `--lf-radius-pill` | `999px` | Status only |
+원자료는 dense table/list + detail 구조를 사용한다. 목록 행이 선택되면 상세 근거가 옆 또는 아래에 열리며, 파일마다 독립 카드가 반복되는 카드 벽을 만들지 않는다.
 
-- Desktop uses a 12-column conceptual grid with 32px gutters; tablet 24px; mobile 16px.
-- Required QA widths are 375, 768, and 1280px. Primary content must never require horizontal scrolling.
-- Admin navigation uses the v3.0.0 fixed eight-item sidebar at desktop widths and a compact horizontal navigation below 62rem.
-- Primary/secondary layouts use a wide work area and a 280–320px action rail. They stack before content becomes cramped.
-- Repeated facts use intrinsic grids. Tables are reserved for real row comparison, not decorative metrics.
-- On mobile, sections form one reading column and actions follow the content they affect.
+## Elevation & Depth
 
-## 5. Components
+깊이는 그림자가 아니라 표면과 경계로 표현한다.
 
-### Work surface (`GovernanceSurface` in code)
+- 기본 페이지: `{colors.canvas}`.
+- 주 작업대: `{colors.surface}` + 1px `{colors.border-subtle}`.
+- 선택된 행: `{colors.cobalt-wash}` + 증거선.
+- 결정 레일: 1px `{colors.border-default}`로 작업대보다 한 단계 강한 경계.
+- 드롭다운·모달만 `0 8px 24px rgba(19, 43, 58, .12)` 이하의 단일 그림자를 허용한다.
 
-- Renders as one white surface with a whisper border and subtle four-layer ambient shadow.
-- The existing code name is retained to avoid behavioral churn; no visible copy uses “governance.”
-- No outer tray, double bezel, neon rim, or nested card decoration.
-- Interactive states use border/color/opacity only. The surface never becomes a click target by accident.
+작업 패널, 행, 섹션에 그림자를 누적하지 않는다. 중첩 카드와 이중 베젤을 금지한다.
 
-### Mobile work queue
+## Shapes
 
-- Requests and weekly reports are lanes in one operating flow, not two dashboard cards. Only the selected lane is expanded.
-- The queue is the navigation and orientation layer: lane name, human status, and selection state. It never repeats the full task description.
-- Default selection follows work priority: stale or approved external material first, then items awaiting a decision, then drafts, then new work. A completed request yields to an unfinished weekly report.
-- The expanded lane contains one current outcome, the evidence needed for that decision, and its next permitted action. Later steps stay hidden until the state machine permits them.
-- On desktop the queue becomes a narrow rail beside the active work. On mobile it is a two-option tab row above the active work. Both use one shared surface rather than nested cards.
-- Current property information is reference material and follows the active work. It does not compete with the task queue or primary action.
+4 / 6 / 8px의 작은 반경을 사용해 정밀한 업무 도구의 성격을 유지한다. 버튼과 입력은 `{rounded.md}`, 주 작업대와 결정 레일은 `{rounded.lg}`를 쓴다. 완전한 pill은 짧은 상태 배지에만 허용한다. 아바타, 장식 원, 큰 둥근 카드로 위계를 만들지 않는다.
 
-### Action button
+## Components
 
-- 44px minimum height, 9px radius, compact label, optional 16px trailing icon.
-- Primary is restrained blue with white text. Secondary is white with a neutral border. Ghost is text-forward.
-- One primary action per task region. Reset and destructive actions are visually separated.
-- Loading preserves label width and exposes `aria-busy`; disabled reasons are explained near the task, not inside technical tooltips.
+### Global rail / compact topbar / appbar
 
-### Status badge
+- 전역 메뉴는 실제 페이지 경로가 존재하는 항목만 보여준다.
+- 현재 위치는 색, `aria-current="page"`, 왼쪽 2px 표식으로 함께 표현한다.
+- 데모 역할 전환기는 전역 레일 하단의 별도 “데모 도구” 영역 또는 개발 전용 패널에 둔다. 업무 결정 레일 안에 두지 않는다.
+- navy rail의 키보드 포커스는 `{colors.focus-on-rail}` 2px 외곽선과 3px 간격을 사용한다.
 
-- Short sentence-case status with a small dot/icon. Examples: “Ready to review,” “Waiting for approval,” “Published.”
-- Badges do not carry IDs, environment names, or implementation state.
+### Task queue
 
-### Section heading
+- 표제, 건물/자료, 마감 또는 업데이트 시각, 사용자용 상태, 다음 인계 대상만 한 행에 둔다.
+- 행 전체가 단일 상세 링크다. 체크박스, 메뉴, 추가 버튼을 한 행에 겹치지 않는다.
+- 선택 행 하나만 `{colors.cobalt-wash}`와 증거선을 가진다.
+- 완료 건수나 KPI를 카드로 반복하지 않는다.
 
-- Optional quiet context line, concise heading, one-sentence description, optional action.
-- Numbered technical eyebrows such as “03 / Role boundary” are prohibited in production UI.
+### Evidence list and comparison
 
-### Workflow step
+- 원자료 목록은 `table`, 상세 사실은 `dl`, 출처 목록은 `ul`, 단계는 `ol`을 기본으로 한다.
+- 변경 비교는 `현재 정보`와 `제안 정보`를 같은 행에 정렬하고, 값만으로 의미가 달라지지 않도록 항목명을 반복한다.
+- 출처 위치는 사람이 이해할 수 있는 파일명·페이지·표/구역으로 표현한다. 내부 식별자는 기본 화면에서 숨긴다.
+- 근거 없는 백분율은 표시하지 않는다. 검증 가능한 근거가 있으면 `출처 2곳에서 확인`, `원문 직접 확인 필요`처럼 행동 가능한 품질 라벨을 쓴다.
 
-- Uses an ordered list with plain task names: “Source,” “Review,” “Approval,” “Published.”
-- Current and completed states include visible text, not color alone.
-- Desktop is four columns; tablet 2×2; mobile vertical.
+### Decision rail
 
-### Data fact and candidate change
+- 현재 상태, 차단 원인, 영향, 복구 행동, 한 개의 주 행동 순서로 구성한다.
+- 같은 단계에서 primary 버튼은 하나만 존재한다. 거절·보완 요청은 secondary 또는 text action이다.
+- 미래 단계는 비활성 버튼 묶음이 아니라 `다음: 선임 승인 대기` 같은 읽기 전용 인계 상태로 표현한다.
+- 하나의 mutation 중에는 관련 작업 영역 전체를 `aria-busy="true"`로 두고 중복 제출을 막는다. 레이블 폭은 유지한다.
 
-- Label → clear value → optional supporting detail.
-- Before/after changes use “Previous” and “Suggested,” with values visually aligned.
-- Source reference, confidence, and version ID live in a secondary disclosure. Confidence may be shown by default only when it materially helps review.
+### Dense registry
 
-### Decision history
+- 기본은 행 밀도 48px 이상, 헤더 고정, 검색·필터·정렬, 선택 상세다.
+- 모바일에서는 우선순위가 낮은 열을 숨기고, 행을 의미 있는 `dl`로 재구성한다. 데스크톱 표를 카드 모음으로 복제하지 않는다.
 
-- Human-readable event label first, person and date second.
-- Raw event keys, actor IDs, and storage metadata are not primary content.
+### Feedback and recovery
 
-## 6. Mobile product contract
+- 로딩은 실제 최종 레이아웃과 같은 skeleton 행을 사용한다.
+- 오류는 `무엇이 실패했는지 → 현재 영향 → 안전한 복구`의 세 문장 이내로 쓴다.
+- 재시도는 실패한 영역 안에 둔다. 성공은 결과와 다음 상태를 한 문장으로 알리고 포커스를 관련 제목으로 옮긴다.
+- 감사 기록처럼 여러 endpoint를 합성하는 표면은 하나라도 실패하면 fail closed로 처리한다. 부분 기록은 숨기고 안전한 재시도만 표시하며, 재시도가 성공한 뒤에만 완전한 기록을 복원한다.
+- API 메시지, 응답 본문, 내부 코드, 영어 fallback은 렌더링하지 않는다.
 
-- Mobile uses the same warm palette and typography, adapted for touch and outdoor readability.
-- The opening view begins with a natural-language or voice request composer, followed by the next task. It is never a marketing hero or dashboard summary.
-- Bottom navigation is fixed to four items in this order: Home, Assigned work, Work records, Weekly report. Buildings are filtered entities, not a fifth tab.
-- The page title is 24–28px on mobile. Supporting copy is at most one short sentence and must never compete with the title.
-- Requests and weekly reports appear before reference data. The active task names the outcome and places its action directly below it.
-- Do not repeat the same workflow state in a hero, metric card, and task card. Do not show seeded or fallback counts when no actual task exists.
-- Current property information uses familiar labels: available area, rent-free, parking support, and floor plan.
-- Superseded files are silently excluded from packages. Mention them only in a relevant warning or history view.
-- Internal labels such as `CONTROL PLANE`, revision, audit events, fixture, candidate patch, and confidential enum values are prohibited.
-- A single boundary note is enough: “Demo data only. No email, phone, or sign-in connection.”
-- Touch targets are at least 44×44px; actions are never arranged more than two abreast at 375px.
-- System text scaling, reduced motion, increased contrast, and screen-reader labels must remain supported.
+## Motion
 
-## 7. Motion and depth
+CSS만 사용하며 JavaScript 모션 의존성을 추가하지 않는다.
 
-- Motion explains input feedback or state change only. Use 140ms press and 220ms state transitions.
-- Animate transform and opacity only; reduced-motion removes nonessential transitions.
-- Page background is flat warm neutral. Work surfaces use a 1px border plus subtle layered shadows:
-  `0 1px 1px rgba(31,29,27,.02)`, `0 2px 4px rgba(31,29,27,.025)`, `0 8px 24px rgba(31,29,27,.035)`, `0 20px 48px rgba(31,29,27,.025)`.
-- Do not use glass blur, gradients, floating-card grids, or heavy shadows.
+| 순간 | 시간 | 속성 | 규칙 |
+| --- | ---: | --- | --- |
+| 누름 | 140ms | `transform`, `background-color` | 최대 `scale(.985)`, 필수 피드백만 |
+| 상태 변화 | 180–220ms | `opacity`, `color`, `border-color` | 성공·오류·선택 변화 |
+| drawer/panel | 최대 360ms | `transform`, `opacity` | 한 번에 한 패널, 배경 이동 없음 |
 
-## 8. Accessibility and personas
+`prefers-reduced-motion: reduce`에서는 누름 변형, 패널 이동, 순차 등장 없이 즉시 상태를 바꾼다. 로딩 의미를 회전 아이콘에만 의존하지 않는다.
 
-| Persona | Context | Pass condition |
-| --- | --- | --- |
-| Data reviewer | Keyboard-heavy review with interruptions | Current task, next action, and recovery state are explicit without memory or color |
-| Senior approver | Reviews consequential external material | Evidence is adjacent to approval and irreversible actions are clearly separated |
-| Property manager | Mobile, glare, one-handed use, time pressure | Concise labels, 44px targets, and a single-column path preserve task completion |
-| Low-vision user | 200% zoom or increased contrast | No two-dimensional primary-content scrolling; focus and state remain visible |
-| Motion-sensitive user | Reduced motion | No movement is required to understand or use the product |
+## Do's and Don'ts
 
-- Target WCAG 2.2 AA; every action is keyboard reachable with a visible focus state.
-- Use landmarks, native controls, ordered workflow lists, live regions, and `aria-current` before custom ARIA.
-- Test 375px, 768px, 1280px, 200% zoom, long Korean/English labels, loading, empty, error, and success states.
-- No accessibility or persona debt is silently accepted.
+| Do | Don't |
+| --- | --- |
+| 대기열 → 근거/비교 → 결정 레일의 일정한 작업 문법 | 히어로 → KPI 카드 → 중첩 카드의 대시보드 문법 |
+| 따뜻한 종이 바탕 + 잉크 레일 + 단일 코발트 | 그라디언트, 글래스, 보라색·청록색 장식 팔레트 |
+| Pretendard Variable 단일 계열 | Georgia, Cinzel, Josefin, 장식 serif |
+| 실제 파일 또는 명시적 “미리보기 없음” | CSS로 그린 가짜 평면도·스태킹 플랜 |
+| 표/목록 + 선택 상세 | 원자료 카드 벽, 모든 항목의 독립 surface |
+| h1 하나, 업무별 h2, 항목 h3 | 크기 때문에 레벨을 건너뛰거나 페이지 제목을 반복 |
+| 현재 단계의 한 primary action | 미래 단계까지 비활성 버튼으로 나열 |
+| 상태의 원인·영향·복구를 함께 표시 | 기술 오류, 내부 상태, 근거 없는 백분율 노출 |
+| 320/375/768/1024/1280과 200%에서 한 방향 스크롤 | 작은 화면의 전역 메뉴 가로 스크롤 |

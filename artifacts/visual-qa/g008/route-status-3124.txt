@@ -1,0 +1,15 @@
+Surface: production HTTP smoke, exact invocation:
+curl -sS -o /tmp/lf-status -w '%{http_code}' http://127.0.0.1:3124<route>
+
+/ 200
+/sources 200
+/changes 200
+/publishing 200
+/operations 200
+/reports 200
+/settings 200
+/sources/new 200
+/operations/versions 200
+/operations/files 200
+/settings/access 200
+/settings/audit 200

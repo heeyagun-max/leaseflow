@@ -24,7 +24,7 @@ afterEach(async () => {
 describe.sequential("synthetic demo route boundary", () => {
   it("fails closed for every demo workflow route unless DEMO_MODE is exactly true", async () => {
     vi.stubEnv("DEMO_MODE", "false");
-    expect((await workflow()).status).toBe(404);
+    expect((await workflow(new Request("http://localhost/api/demo/workflow?actor_id=usr-manager"))).status).toBe(404);
     for (const handler of [extract, confirm, publish, reset, mutateAsset]) {
       const request = new Request("http://localhost/api/demo/action", {
         method: "POST",
@@ -132,7 +132,7 @@ describe.sequential("synthetic demo route boundary", () => {
     tempDirectories.push(directory);
     vi.stubEnv("DEMO_MODE", "true");
     vi.stubEnv("LEASEFLOW_DEMO_STATE_PATH", path.join(directory, "state.v1.json"));
-    const response = await workflow();
+    const response = await workflow(new Request("http://localhost/api/demo/workflow?actor_id=usr-manager"));
     expect(response.status).toBe(200);
     const body = await response.json() as {
       source: Record<string, unknown>;

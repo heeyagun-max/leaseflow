@@ -395,7 +395,7 @@ describe("weekly report persistence and server workflow", () => {
     expect(serialized).not.toContain("Senior approval is pending");
     const forbiddenKeys = ["actor_id", "approved_by", "idempotency_key", "raw_text", "protected_snapshot", "metadata"];
     expect([...collectKeys(publicWorkflow)].filter((key) => forbiddenKeys.includes(key))).toEqual([]);
-    expect(publicWorkflow.labels).toEqual({ mode: "DEMO", role: "LM Manager", delivery: "SANDBOX ONLY" });
+    expect(publicWorkflow.labels).toEqual({ mode: "DEMO", delivery: "SANDBOX ONLY" });
 
     const crossBuilding = structuredClone(drafted);
     const foreignReport = structuredClone(crossBuilding.operations.reports.reports[0]!);

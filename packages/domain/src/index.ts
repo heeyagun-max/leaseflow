@@ -457,6 +457,7 @@ export function selectCurrentFloorPlan<T extends FileVersion>(
 }
 
 export function canPerform(role: UserRole, action: string): boolean {
+  if (action.startsWith("report.")) return false;
   const permissions: Record<UserRole, string[]> = {
     data_steward: ["source.upload", "candidate.confirm"],
     senior_reviewer: ["candidate.review", "record.publish"],
@@ -464,15 +465,21 @@ export function canPerform(role: UserRole, action: string): boolean {
       "package.prepare",
       "package.approve",
       "package.send",
-      "report.prepare",
-      "report.approve",
-      "report.send",
     ],
-    lm_member: ["package.prepare", "report.prepare"],
-    team_lead: ["package.prepare", "report.prepare", "report.approve"],
+    lm_member: ["package.prepare"],
+    team_lead: ["package.prepare"],
     admin: ["*"],
   };
   return permissions[role].includes("*") || permissions[role].includes(action);
+}
+
+export type WeeklyReportAction = "report.prepare" | "report.approve" | "report.send";
+
+export function canPerformWeeklyReportAction(role: UserRole, action: WeeklyReportAction): boolean {
+  if (action === "report.prepare") {
+    return role === "lm_manager" || role === "lm_member" || role === "team_lead" || role === "admin";
+  }
+  return role === "lm_manager";
 }
 
 function requireAction(role: UserRole, action: string): void {
@@ -1460,14 +1467,14 @@ function reportAudit(
   return { ...event, id: `report-audit-${state.audit.length + 1}` };
 }
 
-function requireWeeklyReportActor(actor: { id: string; role: UserRole }, action: string): void {
-  if (!canPerform(actor.role, action)) {
+function requireWeeklyReportActor(actor: { id: string; role: UserRole }, action: WeeklyReportAction): void {
+  if (!canPerformWeeklyReportAction(actor.role, action)) {
     throw new Error(`Role ${actor.role} is not allowed to perform ${action}.`);
   }
 }
 
 function requireLmManager(actor: { id: string; role: UserRole }, action: "report.approve" | "report.send"): void {
-  if (actor.role !== "lm_manager" || !canPerform(actor.role, action)) {
+  if (!canPerformWeeklyReportAction(actor.role, action)) {
     throw new Error(`Role ${actor.role} is not allowed to perform ${action}; LM Manager approval is required.`);
   }
 }

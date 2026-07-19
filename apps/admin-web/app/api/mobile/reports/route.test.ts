@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { demoExtractionResult } from "@leaseflow/demo-data";
 import { DemoFileStore } from "@/lib/demo-store.server";
+import { canViewReportAudit } from "@/lib/report-workflow-public.server";
 import { GET, OPTIONS, POST } from "./route";
 
 const tempDirectories: string[] = [];
@@ -57,9 +58,16 @@ afterEach(async () => {
 });
 
 describe.sequential("weekly report mobile route", () => {
+  it("scopes report audit access to manager-level roles", () => {
+    expect(canViewReportAudit("data_steward")).toBe(false);
+    expect(canViewReportAudit("senior_reviewer")).toBe(false);
+    expect(canViewReportAudit("lm_manager")).toBe(true);
+    expect(canViewReportAudit("admin")).toBe(true);
+  });
+
   it("fails closed outside explicit demo mode", async () => {
     vi.stubEnv("DEMO_MODE", "false");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/mobile/reports?actor_id=usr-manager"));
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({ code: "DEMO_DISABLED" });
   });
@@ -129,11 +137,45 @@ describe.sequential("weekly report mobile route", () => {
     const forbiddenKeys = ["actor_id", "approved_by", "idempotency_key", "raw_text", "protected_snapshot", "metadata"];
     expect([...collectKeys(sent)].filter((key) => forbiddenKeys.includes(key))).toEqual([]);
     expect(JSON.stringify(sent)).not.toContain("mail-002");
+    expect(sent).toMatchObject({
+      allowedActions: ["draft", "investigate", "decide_patch", "approve", "send"],
+      audit: expect.arrayContaining([expect.objectContaining({
+        actor_label: "James Kim",
+        actor_role_label: "임대 관리 책임자",
+      })]),
+    });
 
-    const getResponse = await GET();
+    const getResponse = await GET(new Request("http://localhost/api/mobile/reports?actor_id=usr-manager"));
     expect(getResponse.status).toBe(200);
     expect(getResponse.headers.get("cache-control")).toBe("no-store");
     const current = await getResponse.json() as unknown;
     expect([...collectKeys(current)].filter((key) => forbiddenKeys.includes(key))).toEqual([]);
+  });
+
+  it("returns actor-scoped actions and hides audit history from non-manager roles", async () => {
+    await publishedFixture();
+    for (const actorId of ["usr-junior", "usr-senior"]) {
+      const response = await GET(new Request(`http://localhost/api/mobile/reports?actor_id=${actorId}`));
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ allowedActions: [], audit: [] });
+    }
+  });
+
+  it("keeps the API authoritative when a selected non-LM role attempts report approval", async () => {
+    const published = await publishedFixture();
+    const draftedResponse = await action({
+      action: "draft", actor_id: "usr-manager", expected_revision: published.revision,
+    });
+    const drafted = await draftedResponse.json() as { revision: number; reports: Array<{ id: string }> };
+
+    const response = await action({
+      action: "approve",
+      actor_id: "usr-senior",
+      expected_revision: drafted.revision,
+      report_id: drafted.reports[0]!.id,
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ code: "FORBIDDEN", error: "현재 역할로 이 작업을 수행할 수 없습니다." });
   });
 });

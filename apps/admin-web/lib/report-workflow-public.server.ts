@@ -1,5 +1,6 @@
 import type { InvestigationCommand, ReportPatchGenerationAdapter } from "@leaseflow/ai";
-import type { CreateWeeklyReportDraftInput, WeeklyReport } from "@leaseflow/domain";
+import { canPerformWeeklyReportAction, type CreateWeeklyReportDraftInput, type UserRole, type WeeklyReport } from "@leaseflow/domain";
+import { demoSourceUpdate, demoUsers } from "@leaseflow/demo-data";
 import { z } from "zod/v3";
 import { DemoFileStore, RevisionConflictError, type DemoRuntimeState } from "./demo-store.server";
 import { loadCanonicalWeeklyReportDraft } from "./mock-outlook.server";
@@ -108,7 +109,7 @@ export function createReportWorkflowService(options: ReportWorkflowServiceOption
 }
 
 const publicReportSchema = z.object({
-  id: z.string(), building_id: z.string(), reporting_period: z.object({ from: z.string(), to: z.string() }).strict(),
+  id: z.string(), building_id: z.string(), building_label: z.string(), reporting_period: z.object({ from: z.string(), to: z.string() }).strict(),
   status: z.enum(["draft", "patch_pending", "approved", "sent", "stale"]),
   sections: z.object({
     key_issue: z.string(), changes_since_last_report: z.array(z.string()), activity_summary: z.array(z.string()),
@@ -139,18 +140,52 @@ const publicReportSchema = z.object({
 const publicWorkflowSchema = z.object({
   revision: z.number().int().nonnegative(),
   publication_stage: z.string(),
+  allowedActions: z.array(z.enum(["draft", "investigate", "decide_patch", "approve", "send"])),
   reports: z.array(publicReportSchema),
   activities: z.array(z.object({
     event_type: z.literal("report.sent.sandbox"), report_id: z.string(), building_id: z.string(),
     occurred_at: z.string(), summary: z.string(),
   }).strict()),
-  audit: z.array(z.object({ event_label: z.string(), occurred_at: z.string() }).strict()),
-  labels: z.object({ mode: z.literal("DEMO"), role: z.literal("LM Manager"), delivery: z.literal("SANDBOX ONLY") }).strict(),
+  audit: z.array(z.object({ event_label: z.string(), occurred_at: z.string(), actor_label: z.string(), actor_role_label: z.string() }).strict()),
+  labels: z.object({ mode: z.literal("DEMO"), delivery: z.literal("SANDBOX ONLY") }).strict(),
 }).strict();
 
 export type PublicReportWorkflow = z.infer<typeof publicWorkflowSchema>;
 
-export function toPublicReportWorkflow(state: DemoRuntimeState): PublicReportWorkflow {
+const reportAuditLabels: Record<DemoRuntimeState["operations"]["reports"]["audit"][number]["event_type"], string> = {
+  "report.drafted": "임대인 보고 초안 작성",
+  "report.patch_proposed": "보고 변경안 생성",
+  "report.patch_accepted": "보고 변경안 반영",
+  "report.patch_rejected": "보고 변경안 유지",
+  "report.approved": "임대인 보고 승인",
+  "report.sent.sandbox": "데모 발송 기록",
+  "report.marked_stale": "보고 최신성 재확인 필요",
+};
+
+const roleLabels: Record<UserRole, string> = {
+  data_steward: "데이터 담당자",
+  senior_reviewer: "선임 검토자",
+  lm_manager: "임대 관리 책임자",
+  lm_member: "임대 관리자",
+  team_lead: "팀 책임자",
+  admin: "시스템 관리자",
+};
+
+function reportAllowedActions(role: UserRole) {
+  return [
+    ...(canPerformWeeklyReportAction(role, "report.prepare") ? ["draft", "investigate", "decide_patch"] as const : []),
+    ...(canPerformWeeklyReportAction(role, "report.approve") ? ["approve"] as const : []),
+    ...(canPerformWeeklyReportAction(role, "report.send") ? ["send"] as const : []),
+  ];
+}
+
+export function canViewReportAudit(role: UserRole) {
+  return role === "lm_manager" || role === "admin";
+}
+
+export function toPublicReportWorkflow(state: DemoRuntimeState, actorId = "usr-manager"): PublicReportWorkflow {
+  const actor = demoUsers.find((user) => user.id === actorId);
+  if (!actor) throw new Error(`Unknown demo actor: ${actorId}.`);
   const scopedBuildingId = state.publication_scope.building_id;
   if (state.operations.reports.reports.some((report) => report.building_id !== scopedBuildingId
     || report.sources.some((source) => source.building_id !== scopedBuildingId)
@@ -161,9 +196,11 @@ export function toPublicReportWorkflow(state: DemoRuntimeState): PublicReportWor
   return publicWorkflowSchema.parse({
     revision: state.revision,
     publication_stage: state.stage,
+    allowedActions: reportAllowedActions(actor.role),
     reports: state.operations.reports.reports.map((report) => ({
       id: report.id,
       building_id: report.building_id,
+      building_label: report.building_id === demoSourceUpdate.buildingId ? demoSourceUpdate.buildingName : "알 수 없는 건물",
       reporting_period: report.reporting_period,
       status: report.status,
       sections: report.current_sections,
@@ -192,7 +229,12 @@ export function toPublicReportWorkflow(state: DemoRuntimeState): PublicReportWor
     activities: state.operations.reports.activities.map(({ event_type, report_id, building_id, occurred_at, summary }) => ({
       event_type, report_id, building_id, occurred_at, summary,
     })),
-    audit: state.operations.reports.audit.map(({ event_type, occurred_at }) => ({ event_label: event_type, occurred_at })),
-    labels: { mode: "DEMO", role: "LM Manager", delivery: "SANDBOX ONLY" },
+    audit: canViewReportAudit(actor.role) ? state.operations.reports.audit.map(({ event_type, occurred_at, actor_id, actor_role }) => ({
+      event_label: reportAuditLabels[event_type],
+      occurred_at,
+      actor_label: demoUsers.find((user) => user.id === actor_id)?.display_name ?? "알 수 없는 데모 사용자",
+      actor_role_label: roleLabels[actor_role],
+    })) : [],
+    labels: { mode: "DEMO", delivery: "SANDBOX ONLY" },
   });
 }

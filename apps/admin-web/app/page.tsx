@@ -1,5 +1,3 @@
-import { GovernanceWorkspace } from "@/components/governance/governance-workspace";
+import { AdminPage } from "@/components/governance/admin-pages";
 
-export default function Page() {
-  return <GovernanceWorkspace />;
-}
+export default function Page() { return <AdminPage view="home" />; }

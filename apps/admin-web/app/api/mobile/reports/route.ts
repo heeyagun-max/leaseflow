@@ -58,11 +58,13 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: responseHeaders });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     assertDemoMode();
+    const actorId = new URL(request.url).searchParams.get("actor_id");
+    if (!actorId) throw new Error("Unknown demo actor: missing actor_id.");
     const service = createReportWorkflowService();
-    return json(toPublicReportWorkflow(await service.getState()));
+    return json(toPublicReportWorkflow(await service.getState(), actorId));
   } catch (error) {
     return reportError(error);
   }
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
         state = await service.send(input);
         break;
     }
-    return json(toPublicReportWorkflow(state));
+    return json(toPublicReportWorkflow(state, input.actor_id));
   } catch (error) {
     return reportError(error);
   }

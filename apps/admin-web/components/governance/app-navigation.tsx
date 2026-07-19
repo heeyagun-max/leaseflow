@@ -1,44 +1,87 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
-interface AppNavigationProps {
-  current: "governance" | "reports";
-}
-
-const ADMIN_NAV_ITEMS = [
-  { label: "대시보드", href: "/#overview", key: "dashboard", mark: "대" },
-  { label: "원자료 등록부", href: "/#source-assets", key: "source", mark: "원" },
-  { label: "검토·게시", href: "/", key: "governance", mark: "검" },
-  { label: "건물", href: "/#published-records", key: "buildings", mark: "건" },
-  { label: "보고그룹", href: "/reports#report-group", key: "report-groups", mark: "그" },
-  { label: "보고일정", href: "/reports", key: "reports", mark: "일" },
-  { label: "사용자·권한", href: "/#role-control", key: "users", mark: "권" },
-  { label: "발송·감사", href: "/#audit-trail", key: "audit", mark: "감" },
+export const ADMIN_NAV_ITEMS = [
+  { label: "오늘의 업무", href: "/" },
+  { label: "원자료", href: "/sources" },
+  { label: "변경 검토", href: "/changes" },
+  { label: "승인·게시", href: "/publishing" },
+  { label: "운영 정보", href: "/operations" },
+  { label: "임대인 보고", href: "/reports" },
+  { label: "설정·기록", href: "/settings" },
 ] as const;
 
-export function AppNavigation({ current }: AppNavigationProps) {
+function isCurrent(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
   return (
-    <aside className="lf-app-nav">
-      <Link className="lf-app-nav__brand" href="/" aria-label="LeaseFlow 자산 운영 홈">
-        <span>
+    <nav className="lf-admin-nav__links" aria-label="관리자 전역 메뉴">
+      {ADMIN_NAV_ITEMS.map((item) => (
+        <Link
+          aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
+          href={item.href}
+          key={item.href}
+          {...(onNavigate ? { onClick: onNavigate } : {})}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function AppNavigation() {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  function openDrawer() {
+    dialogRef.current?.showModal();
+  }
+
+  function closeDrawer() {
+    dialogRef.current?.close();
+  }
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const restoreFocus = () => triggerRef.current?.focus();
+    dialog.addEventListener("close", restoreFocus);
+    return () => dialog.removeEventListener("close", restoreFocus);
+  }, []);
+
+  return (
+    <>
+      <aside className="lf-admin-nav" aria-label="관리자 전역 탐색">
+        <Link className="lf-admin-nav__brand" href="/" aria-label="LeaseFlow 오늘의 업무">
           <strong>LeaseFlow</strong>
-          <span>자산 운영 대장</span>
-        </span>
-      </Link>
-      <nav className="lf-app-nav__links" aria-label="관리자 메뉴">
-        {ADMIN_NAV_ITEMS.map((item) => {
-          const selected = item.key === current;
-          return (
-            <Link aria-current={selected ? "page" : undefined} href={item.href} key={item.key}>
-              <span className="lf-app-nav__item-mark" aria-hidden="true">{item.mark}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="lf-app-nav__account">
-        <span className="lf-app-nav__avatar" aria-hidden="true">데</span>
-        <span><strong>합성 데이터 데모</strong><small>담당자는 화면에서 선택</small></span>
-      </div>
-    </aside>
+          <span>운영 정보 대장</span>
+        </Link>
+        <NavLinks />
+      </aside>
+
+      <header className="lf-admin-appbar">
+        <Link href="/" className="lf-admin-appbar__brand">LeaseFlow</Link>
+        <button ref={triggerRef} type="button" onClick={openDrawer} aria-haspopup="dialog">
+          메뉴 열기
+        </button>
+      </header>
+
+      <dialog ref={dialogRef} className="lf-admin-drawer" aria-labelledby="admin-drawer-title">
+        <div className="lf-admin-drawer__panel">
+          <div className="lf-admin-drawer__heading">
+            <h2 id="admin-drawer-title">관리자 메뉴</h2>
+            <button type="button" onClick={closeDrawer}>메뉴 닫기</button>
+          </div>
+          <NavLinks onNavigate={closeDrawer} />
+        </div>
+      </dialog>
+    </>
   );
 }
