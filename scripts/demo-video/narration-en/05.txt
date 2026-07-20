@@ -1,0 +1,1 @@
+A call or email request becomes a structured task. LeaseFlow confirms the request, selects only current shareable materials, prepares the message and recipients, and still requires a human to review and approve before delivery. The demo records the send without pretending to integrate with a production mailbox.

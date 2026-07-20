@@ -1,3 +1,5 @@
+import { fetchOperationsSnapshot } from "./operations-snapshot";
+
 export interface MobileWorkflowView {
   revision: number;
   publication_stage: string;
@@ -40,7 +42,7 @@ async function readResponse(response: Response): Promise<MobileWorkflowView> {
 }
 
 export async function fetchMobileWorkflow(options: WorkflowClientOptions = {}): Promise<MobileWorkflowView> {
-  return readResponse(await (options.fetcher ?? fetch)(endpoint(options), { headers: { Accept: "application/json" } }));
+  return (await fetchOperationsSnapshot(options)).workflow;
 }
 
 export async function mutateMobileWorkflow(

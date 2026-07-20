@@ -10,10 +10,10 @@ import {
 } from "./admin-format";
 
 describe("admin presentation formatters", () => {
-  it("maps workflow values to Korean labels without raw fallbacks", () => {
+  it("maps workflow values to user-facing labels without raw fallbacks", () => {
     expect(publicationStageLabels.junior_confirmed).toBe("선임 승인 대기");
     expect(assetStatusLabels.steward_confirmed).toBe("1차 확인 완료");
-    expect(roleLabels.senior_reviewer).toBe("선임 검토자");
+    expect(roleLabels.senior_reviewer).toBe("Senior Reviewer");
     expect(formatFieldValue("marketed_area_py", 200)).toBe("200평");
     expect(formatFieldValue("marketed_area_py", "200")).toBe("표시할 수 없는 값");
   });

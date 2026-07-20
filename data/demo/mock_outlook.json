@@ -28,5 +28,45 @@
     "subject": "Cobalt Finance Center 5F materials",
     "body": "Approved package prepared and sent through LeaseFlow sandbox.",
     "share_scope": "external_reportable"
+  },
+  {
+    "id": "mail-pacific-001",
+    "building_id": "bld-pacific-gate",
+    "thread_id": "thread-pacific-gate",
+    "occurred_at": "2026-07-16T10:15:00+09:00",
+    "direction": "inbound",
+    "subject": "Pacific Gate Tower leasing tour update",
+    "body": "The tenant tour is confirmed for Friday and the current leasing overview may be shared.",
+    "share_scope": "external_reportable"
+  },
+  {
+    "id": "mail-pacific-002",
+    "building_id": "bld-pacific-gate",
+    "thread_id": "thread-pacific-gate",
+    "occurred_at": "2026-07-17T16:20:00+09:00",
+    "direction": "inbound",
+    "subject": "Pacific Gate draft commercial discussion",
+    "body": "A confidential draft incentive is under internal review and must not enter the landlord report.",
+    "share_scope": "client_confidential"
+  },
+  {
+    "id": "mail-teheran-001",
+    "building_id": "bld-teheran-link",
+    "thread_id": "thread-teheran-link",
+    "occurred_at": "2026-07-17T11:40:00+09:00",
+    "direction": "outbound",
+    "subject": "Teheran Link leasing inquiry status",
+    "body": "The current availability summary was shared with the approved prospect contact.",
+    "share_scope": "external_reportable"
+  },
+  {
+    "id": "mail-teheran-002",
+    "building_id": "bld-teheran-link",
+    "thread_id": "thread-teheran-link",
+    "occurred_at": "2026-07-18T08:50:00+09:00",
+    "direction": "inbound",
+    "subject": "Teheran Link internal negotiation note",
+    "body": "Internal negotiation thresholds are confidential and must not enter the landlord report.",
+    "share_scope": "client_confidential"
   }
 ]

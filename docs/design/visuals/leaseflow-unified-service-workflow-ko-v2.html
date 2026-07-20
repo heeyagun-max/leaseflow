@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LeaseFlow 통합 서비스 워크플로 v2</title>
+  <style>
+    :root {
+      --ink:#13283b; --ink2:#3c5366; --muted:#718492; --paper:#f3f6f7; --surface:#fff; --line:#d7e2e7;
+      --navy:#173e5d; --navy2:#e9f1f7; --teal:#187d77; --teal2:#e3f2f0; --amber:#d39329; --amber2:#fff2dc; --red2:#fff0ed;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:2400px; height:1650px; overflow:hidden; }
+    body { font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; color:var(--ink); background:linear-gradient(140deg,#fbfcfc,var(--paper)); }
+    .canvas { width:100%; height:100%; padding:66px 76px 58px; }
+    header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px; }
+    .eyebrow { color:var(--teal); font-size:22px; font-weight:850; letter-spacing:.045em; margin-bottom:10px; }
+    h1 { margin:0; font-size:64px; line-height:1.08; letter-spacing:-.04em; }
+    .subtitle { margin:15px 0 0; color:var(--ink2); font-size:25px; }
+    .legend { display:flex; gap:10px; }
+    .legend span { border-radius:999px; padding:11px 16px; background:white; border:1px solid var(--line); color:var(--ink2); font-size:16px; font-weight:800; }
+    .legend .web { background:var(--amber2); border-color:#e7c17f; }
+    .legend .common { background:var(--teal2); border-color:#9bcac5; }
+    .board { display:grid; grid-template-columns:405px 1fr; gap:24px; height:1290px; }
+    .hub { display:grid; grid-template-rows:1fr 332px; gap:22px; }
+    .panel { background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:22px; box-shadow:0 16px 44px rgba(23,50,68,.07); }
+    .hub-main { padding:28px; display:flex; flex-direction:column; }
+    .hub-main small { color:var(--teal); font-weight:900; font-size:15px; letter-spacing:.05em; }
+    .hub-main h2 { margin:8px 0 12px; font-size:31px; }
+    .hub-main p { margin:0; color:var(--ink2); font-size:17px; line-height:1.5; }
+    .building { margin:24px 0 18px; border-radius:20px; background:var(--navy); color:white; padding:24px 20px; text-align:center; }
+    .building .icon { font-size:42px; line-height:1; }
+    .building b { display:block; margin-top:12px; font-size:24px; }
+    .building span { display:block; margin-top:7px; color:#ccdae3; font-size:14px; line-height:1.45; }
+    .hub-items { display:grid; gap:10px; }
+    .hub-item { padding:13px 15px; border-radius:11px; background:#f6f9fa; border-left:4px solid var(--teal); }
+    .hub-item b { font-size:16px; }
+    .hub-item span { display:block; margin-top:4px; color:var(--muted); font-size:13px; }
+    .hub-rule { margin-top:auto; padding:14px 15px; border-radius:12px; background:var(--red2); color:#864c43; font-size:14px; line-height:1.42; }
+    .hub-visual { overflow:hidden; }
+    .hub-visual img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+    .flows { display:grid; grid-template-rows:390px 438px 418px; gap:22px; }
+    .flow { padding:25px 27px; }
+    .flow-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+    .flow-id { display:flex; align-items:center; gap:13px; }
+    .flow-num { width:44px; height:44px; display:grid; place-items:center; border-radius:13px; background:var(--navy); color:white; font-size:20px; font-weight:900; }
+    .update .flow-num, .weekly .flow-num { background:var(--amber); }
+    .flow h2 { margin:0; font-size:29px; }
+    .flow-head p { margin:5px 0 0; color:var(--muted); font-size:16px; }
+    .badge { border-radius:999px; padding:9px 14px; font-size:14px; font-weight:850; background:var(--teal2); color:#286763; border:1px solid #a8cec9; }
+    .badge.web { background:var(--amber2); color:#815b20; border-color:#e8c787; }
+    .pipeline { display:grid; grid-template-columns:repeat(5,1fr); gap:30px; align-items:stretch; }
+    .step { position:relative; min-height:206px; border:1px solid var(--line); border-top:5px solid var(--navy); border-radius:15px; background:#fafcfc; padding:18px 17px; }
+    .step:after { content:"→"; position:absolute; right:-24px; top:42%; color:#77a19e; font-size:25px; font-weight:500; }
+    .step:last-child:after { display:none; }
+    .update .step, .weekly .step { border-top-color:var(--amber); }
+    .step.shared { background:var(--teal2); border-color:#a3cfca; border-top-color:var(--teal); }
+    .step.review { background:var(--amber2); border-color:#e8c98c; border-top-color:var(--amber); }
+    .step.block { background:var(--red2); border-color:#e5b5ad; border-top-color:#c65d4d; }
+    .kicker { color:var(--muted); font-size:12px; font-weight:900; letter-spacing:.05em; }
+    .step h3 { margin:9px 0 8px; font-size:20px; line-height:1.28; }
+    .step p { margin:0; color:var(--ink2); font-size:14px; line-height:1.45; }
+    .who { position:absolute; left:15px; bottom:14px; border-radius:8px; padding:6px 9px; background:white; border:1px solid var(--line); color:var(--muted); font-size:12px; font-weight:800; }
+    .branch { margin-top:15px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .branch-item { display:flex; align-items:center; gap:10px; border-radius:12px; padding:12px 14px; background:#f6f9fa; color:var(--ink2); font-size:14px; }
+    .branch-item b { color:var(--ink); }
+    .dot { width:12px; height:12px; border-radius:50%; background:var(--teal); flex:0 0 auto; }
+    .weekly .pipeline { grid-template-columns:repeat(6,1fr); gap:26px; }
+    .weekly .step { min-height:204px; }
+    .weekly .step:after { right:-22px; }
+    .schedule { margin-top:15px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .schedule div { border-radius:10px; padding:10px 12px; background:#f7f9fa; color:var(--ink2); font-size:13px; text-align:center; }
+    .schedule b { color:var(--ink); }
+    footer { position:absolute; left:76px; right:76px; bottom:22px; display:flex; justify-content:space-between; color:var(--muted); font-size:15px; }
+    footer strong { color:var(--ink2); }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <header>
+      <div>
+        <div class="eyebrow">LEASEFLOW · THREE CONNECTED WORK LOOPS · V2</div>
+        <h1>하나의 최신 건물정보가 일상 업무·정보 업데이트·주간보고를 연결한다</h1>
+        <p class="subtitle">웹과 앱은 같은 서비스를 사용하고, 정보 업로드와 자동화 설정만 웹에서 확장된다</p>
+      </div>
+      <div class="legend"><span class="common">웹·앱 공통</span><span class="web">웹 전용</span><span>사람 확인 필수</span></div>
+    </header>
+
+    <section class="board">
+      <aside class="hub">
+        <div class="panel hub-main">
+          <small>SHARED SERVICE CORE</small>
+          <h2>팀 공통 최신 건물정보</h2>
+          <p>사무실 웹과 현장 앱이 동일한 건물·자료·업무기록을 사용한다.</p>
+          <div class="building"><div class="icon">▦</div><b>건물별 현재 운영정보</b><span>공실 · 면적 · 층 · 입주시기 · 임대조건<br>도면 · 스태킹 플랜 · 관련 업무</span></div>
+          <div class="hub-items">
+            <div class="hub-item"><b>공통 검색 대상</b><span>건물정보 · 원자료 · 최신 파일 · 업무 스레드</span></div>
+            <div class="hub-item"><b>공통 작업 상태</b><span>최근 검색 · 진행 요청 · 보고 준비 · 담당자</span></div>
+            <div class="hub-item"><b>공통 권한</b><span>사용자 역할 · 담당 건물 · 외부 공유 범위</span></div>
+            <div class="hub-item"><b>공통 감사기록</b><span>출처 · 버전 · 확인자 · 사용 시점</span></div>
+          </div>
+          <div class="hub-rule"><b>업로드 ≠ 즉시 최신정보</b><br>신규 자료의 추출값은 담당자 확인과 게시를 거쳐야 공통 검색·앱·보고서에 사용된다.</div>
+        </div>
+        <div class="panel hub-visual"><img src="leaseflow-unified-web-mobile-concept-v2.png" alt="웹과 앱이 공통 최신 건물정보를 사용하는 개념도" /></div>
+      </aside>
+
+      <div class="flows">
+        <section class="panel flow daily">
+          <div class="flow-head"><div class="flow-id"><div class="flow-num">A</div><div><h2>일상 업무 루프</h2><p>사무실 웹과 현장 앱에서 동일하게 제공</p></div></div><span class="badge">웹·앱 공통</span></div>
+          <div class="pipeline">
+            <div class="step shared"><div class="kicker">ENTRY</div><h3>자연어·음성 요청</h3><p>“퍼시픽타워 최신 도면과 임대조건 보여줘.”</p><span class="who">웹 또는 앱</span></div>
+            <div class="step"><div class="kicker">UNDERSTAND</div><h3>의도와 조건 확인</h3><p>건물·지역·면적·층·입주시기·자료기한을 구조화</p><span class="who">서비스</span></div>
+            <div class="step"><div class="kicker">RETRIEVE</div><h3>권한 내 최신정보 검색</h3><p>게시된 현재값과 유효한 파일, 출처 근거를 함께 조회</p><span class="who">공통 데이터</span></div>
+            <div class="step shared"><div class="kicker">RESULT</div><h3>결과와 자료 제시</h3><p>건물 비교, 파일 미리보기, 자료 묶음과 다음 행동을 제안</p><span class="who">웹 또는 앱</span></div>
+            <div class="step"><div class="kicker">CONTINUE</div><h3>업무 스레드로 저장</h3><p>회신·보완·자료 준비를 팀원이 다른 기기에서 이어서 처리</p><span class="who">팀 공통</span></div>
+          </div>
+        </section>
+
+        <section class="panel flow update">
+          <div class="flow-head"><div class="flow-id"><div class="flow-num">B</div><div><h2>건물정보 업데이트 루프</h2><p>신규 임대인 자료를 모든 팀원이 쓸 수 있는 최신정보로 전환</p></div></div><span class="badge web">건물정보 업로드 · 웹 전용</span></div>
+          <div class="pipeline">
+            <div class="step review"><div class="kicker">UPLOAD</div><h3>신규 자료 올리기</h3><p>PDF·Excel·도면·임대안내문·이메일 첨부를 등록</p><span class="who">자료 담당자</span></div>
+            <div class="step"><div class="kicker">CLASSIFY</div><h3>임대인·건물 연결</h3><p>자료 종류와 적용 대상을 제안하고 담당자가 확정</p><span class="who">웹</span></div>
+            <div class="step"><div class="kicker">COMPARE</div><h3>새 정보와 이전값 비교</h3><p>면적·층·조건·입주일·도면 버전의 달라진 부분만 표시</p><span class="who">웹</span></div>
+            <div class="step block"><div class="kicker">HUMAN GATE</div><h3>확인·승인</h3><p>유지·변경·보완을 결정한다. AI 후보가 공식값을 덮어쓰지 못함</p><span class="who">담당자 → 시니어</span></div>
+            <div class="step shared"><div class="kicker">PUBLISH</div><h3>팀 공통 최신정보 반영</h3><p>승인 즉시 권한 있는 모든 팀원의 웹·앱 검색과 업무에 사용</p><span class="who">공통 서비스</span></div>
+          </div>
+          <div class="branch">
+            <div class="branch-item"><span class="dot"></span><span><b>웹 반영</b> · 자연어 검색, 건물 상세, 자료·업무, 주간 이슈</span></div>
+            <div class="branch-item"><span class="dot"></span><span><b>앱 반영</b> · 자연어·음성 검색, 현장 조회, 자료 준비, 업무 기록</span></div>
+          </div>
+        </section>
+
+        <section class="panel flow weekly">
+          <div class="flow-head"><div class="flow-id"><div class="flow-num">C</div><div><h2>임대인 주간업무 루프</h2><p>평소 쌓인 최신정보와 업무활동이 주간 미팅 자료로 이어짐</p></div></div><span class="badge web">주간업무 설정 · 웹 전용</span></div>
+          <div class="pipeline">
+            <div class="step review"><div class="kicker">SET ONCE</div><h3>임대인 보고그룹 설정</h3><p>포함 건물, 담당팀, 보고기간과 미팅 일정을 지정</p><span class="who">임대 관리자</span></div>
+            <div class="step"><div class="kicker">COLLECT</div><h3>한 주간 이슈 자동 수집</h3><p>최신정보 변경, 문의·투어·제안·협의, 누락·위험을 건물별 수집</p><span class="who">서비스</span></div>
+            <div class="step"><div class="kicker">GROUP</div><h3>임대인 아래 건물별 구성</h3><p>전체 요약 아래에 건물 A·B·C의 이슈와 근거를 배치</p><span class="who">서비스</span></div>
+            <div class="step"><div class="kicker">DRAFT</div><h3>보고 초안 제안</h3><p>다음 주 예정과 임대인 의사결정 요청까지 초안을 준비</p><span class="who">웹·앱 확인</span></div>
+            <div class="step block"><div class="kicker">HUMAN GATE</div><h3>담당자 검토·최종 승인</h3><p>문장, 근거, 포함 건물, 수신자·첨부를 정확히 확인</p><span class="who">담당자 → 승인자</span></div>
+            <div class="step shared"><div class="kicker">USE</div><h3>주간 미팅·보고 이력</h3><p>미팅에 사용하고 당시 정보 버전과 승인 기록을 보존</p><span class="who">임대인 미팅</span></div>
+          </div>
+          <div class="schedule">
+            <div><b>사전 취합</b> · 변경·활동 모으기</div><div><b>담당자 확인</b> · 누락·오류 보완</div><div><b>최종 검토</b> · 승인자 확인</div><div><b>미팅 준비 완료</b> · 최종본 고정</div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <footer><span><strong>제품 가치</strong> · 정보를 한 번 올리고 확인하면 팀 전체가 웹·앱·주간보고에서 반복 활용한다.</span><span>LeaseFlow · Unified service concept v2</span></footer>
+  </main>
+</body>
+</html>

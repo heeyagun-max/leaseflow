@@ -19,3 +19,8 @@ real-company-data/
 exports/
 artifacts/submission/LeaseFlow_Demo_Narration_KO.aiff
 artifacts/submission/LeaseFlow_Demo_Narration_KO.txt
+artifacts/submission/*.mp4
+artifacts/submission/video-*/
+artifacts/visual-qa/
+apps/mobile/dist-en-*/
+docs/submission/*.docx

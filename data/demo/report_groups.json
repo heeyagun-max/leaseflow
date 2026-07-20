@@ -1,0 +1,90 @@
+{
+  "revision": 1,
+  "groups": [
+    {
+      "ref": "hanbit-weekly",
+      "landlord_name": "한빛자산운용",
+      "building_ids": ["bld-cobalt", "bld-pacific-gate"],
+      "cadence": "weekly",
+      "meeting_weekday": "thursday",
+      "meeting_time": "15:00",
+      "next_meeting_on": "2026-07-23",
+      "owner_user_id": "usr-manager",
+      "approver_user_id": "usr-manager",
+      "recipients": {
+        "to": [{ "email": "hanbit.leasing@example.test", "role": "to_landlord_practical" }],
+        "cc": [
+          { "email": "hanbit.asset@example.test", "role": "cc_landlord_team" },
+          { "email": "hanbit.executive@example.test", "role": "cc_landlord_exec" },
+          { "email": "lease.team@example.test", "role": "cc_lm_team" },
+          { "email": "lease.manager@example.test", "role": "cc_lm_exec" }
+        ]
+      },
+      "automation": {
+        "aggregation_days": 7,
+        "required_section_keys": [
+          "key_issue",
+          "changes_since_last_report",
+          "activity_summary",
+          "negotiated_area_floor_changes",
+          "competitor_buildings",
+          "blocker_and_pending_approval",
+          "next_actions"
+        ],
+        "checkpoints": {
+          "pre_summary_time": "16:00",
+          "morning_refresh_time": "08:00",
+          "final_review_time": "14:30",
+          "delivery_time": "15:00"
+        }
+      },
+      "report_scope": "building_specific",
+      "configuration_revision": 1,
+      "updated_by": "usr-manager",
+      "updated_at": "2026-07-18T09:00:00.000Z"
+    },
+    {
+      "ref": "seorin-biweekly",
+      "landlord_name": "서린리츠",
+      "building_ids": ["bld-teheran-link"],
+      "cadence": "biweekly",
+      "meeting_weekday": "tuesday",
+      "meeting_time": "10:30",
+      "next_meeting_on": "2026-07-28",
+      "owner_user_id": "usr-manager",
+      "approver_user_id": "usr-manager",
+      "recipients": {
+        "to": [{ "email": "seorin.operations@example.test", "role": "to_landlord_practical" }],
+        "cc": [
+          { "email": "seorin.team@example.test", "role": "cc_landlord_team" },
+          { "email": "seorin.executive@example.test", "role": "cc_landlord_exec" },
+          { "email": "lease.team@example.test", "role": "cc_lm_team" },
+          { "email": "lease.manager@example.test", "role": "cc_lm_exec" }
+        ]
+      },
+      "automation": {
+        "aggregation_days": 14,
+        "required_section_keys": [
+          "key_issue",
+          "changes_since_last_report",
+          "activity_summary",
+          "negotiated_area_floor_changes",
+          "competitor_buildings",
+          "blocker_and_pending_approval",
+          "next_actions"
+        ],
+        "checkpoints": {
+          "pre_summary_time": "16:00",
+          "morning_refresh_time": "08:00",
+          "final_review_time": "10:00",
+          "delivery_time": "10:30"
+        }
+      },
+      "report_scope": "building_specific",
+      "configuration_revision": 1,
+      "updated_by": "usr-manager",
+      "updated_at": "2026-07-18T09:00:00.000Z"
+    }
+  ],
+  "audit": []
+}

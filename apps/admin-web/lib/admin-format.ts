@@ -34,12 +34,12 @@ export function formatBytes(value: number) {
 }
 
 export const roleLabels: Record<UserRole, string> = {
-  data_steward: "데이터 담당자",
-  senior_reviewer: "선임 검토자",
-  lm_manager: "임대 관리 책임자",
-  lm_member: "임대 관리자",
-  team_lead: "팀 책임자",
-  admin: "시스템 관리자",
+  data_steward: "Data Steward",
+  senior_reviewer: "Senior Reviewer",
+  lm_manager: "Leasing Manager",
+  lm_member: "Leasing Team Member",
+  team_lead: "Team Lead",
+  admin: "Administrator",
 };
 
 export const publicationStageLabels: Record<PublicationStage, string> = {

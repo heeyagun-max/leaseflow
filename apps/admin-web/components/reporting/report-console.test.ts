@@ -22,4 +22,18 @@ describe("report console boundaries", () => {
     expect(selectReportByRef(reports, "unknown-report")).toBeUndefined();
     expect(selectReportByRef(reports, "report-cobalt-2026-w29")).toBe(reports[0]);
   });
+
+  it("scopes a legacy queue draft to its current building", () => {
+    expect(buildReportMutationBody({
+      action: "draft",
+      actorId: "usr-manager",
+      buildingId: "bld-cobalt",
+      revision: 9,
+    })).toEqual({
+      action: "draft",
+      actor_id: "usr-manager",
+      expected_revision: 9,
+      building_id: "bld-cobalt",
+    });
+  });
 });

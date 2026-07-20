@@ -9,10 +9,10 @@ Checked items have repository or local verification evidence. Unchecked items re
 - [x] `npm run demo:reset` performs a revision-aware reset while Admin is running.
 - [x] Demo roles, sandbox boundary, and human approval steps are visible in both surfaces.
 - [x] Runtime fixtures and the judge path use synthetic data.
-- [x] 126 tests (reset CLI 2, Admin 57, Mobile 10, AI 9, Demo Data 11, Domain 37) and all five workspace typechecks passed.
-- [x] Repository validation, the 13-route Admin production build, and Expo Web export passed.
+- [x] 289 tests (reset CLI 2, Admin 201, Mobile 18, AI 9, Demo Data 15, Domain 44) and all five workspace typechecks passed.
+- [x] Repository validation, the 32-page Admin production build, and Expo Web export passed.
 - [x] Stage 5 Admin and Mobile browser QA passed at 320, 375, 768, and 1280 px; final cleanup QA checked Admin at 375, 768, and 1280 px with no horizontal overflow or console errors.
-- [x] README, English Devpost copy, Korean meaning check, three-minute script, and runtime boundary are documented.
+- [x] README, canonical English Devpost form answers, `Codex for Everyone` concept, three-minute English narration, and runtime boundary are documented.
 - [x] Local narrated video is complete at 109.145 seconds with verified 1920×1080 avc1/H.264 + AAC tracks, 51,723,559-byte size, SHA-256 `5b1f85b3c0a3339b388255f10c37ccddee14e3dc6a76085800d2186629e33bcc`, automated seven-frame OCR confirming synthetic markers and zero generic secret-pattern matches, and manual 5/30/60/90-second sample checks. No reproducible local sensitive-identifier list was configured.
 - [x] The MP4 is intentionally included in the local git submission package; `.omo`, `apps/admin-web/data`, and `docs/reference` are ignored, and repository validation rejects forbidden staged paths.
 - [x] Primary Codex session ID `019f7335-4b59-7e81-8131-b31800757887` is recorded.

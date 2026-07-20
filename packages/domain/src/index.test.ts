@@ -29,6 +29,7 @@ import {
   selectCurrentPublished,
   selectExternalReportableSources,
   selectExternallyVisibleAssets,
+  selectPublishedDocumentReferences,
   sendOperationalPackage,
   sendWeeklyReport,
   validateLandlordRecipients,
@@ -65,13 +66,19 @@ describe("governed source asset registry", () => {
   const steward = { id: "usr-junior", role: "data_steward" as const };
   const senior = { id: "usr-senior", role: "senior_reviewer" as const };
 
-  function confirm(registry: GovernedAssetRegistry, assetId = registry.assets[0]!.id, shareable = true) {
+  function confirm(
+    registry: GovernedAssetRegistry,
+    assetId = registry.assets[0]!.id,
+    shareable = true,
+    reviewedSummary?: string,
+  ) {
     return confirmSourceAsset(registry, {
       asset_id: assetId,
       building_id: "bld-cobalt",
       externally_shareable: shareable,
       actor: steward,
       occurred_at: "2026-07-18T02:00:00.000Z",
+      ...(reviewedSummary ? { reviewed_summary: reviewedSummary } : {}),
     });
   }
 
@@ -86,6 +93,66 @@ describe("governed source asset registry", () => {
       ]),
     });
   }
+
+  it("registers a reviewed-document candidate with governance metadata outside CandidateChange", () => {
+    const registry = registerSourceAsset({ assets: [] }, {
+      id: "doc-owner-update-july",
+      observed_filename: "Synthetic_Cobalt_monthly_owner_update_202607.pdf",
+      synthetic_fingerprint: "synthetic:owner-update-july",
+      mime_type: "application/pdf",
+      byte_size: 2400,
+      building_alias_candidate: "Cobalt Finance Center",
+      building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Management",
+      occurred_at: "2026-07-20T01:00:00.000Z",
+      document_type: "monthly_owner_update",
+      source_format: "pdf",
+      content_fingerprint: "sha256:synthetic-owner-update-july",
+      source_origin: "synthetic_seed",
+      reviewed_summary: null,
+      review_policy: "publishable_reference",
+    } as Parameters<typeof registerSourceAsset>[1]);
+
+    expect(registry.assets[0]).toMatchObject({
+      building_id: "bld-cobalt",
+      document_type: "monthly_owner_update",
+      source_format: "pdf",
+      content_fingerprint: "sha256:synthetic-owner-update-july",
+      source_origin: "synthetic_seed",
+      reviewed_summary: null,
+      review_policy: "publishable_reference",
+      status: "registered",
+    });
+  });
+
+  it.each([
+    ["Synthetic_Cobalt_legal_202607.pdf", "legal_document", "review_only"],
+    ["Synthetic_Cobalt_area_202607.xlsx", "area_workbook", "review_only"],
+    ["Synthetic_Cobalt_floor_plan_202607.dwg", "floor_plan", "manual_review"],
+  ] as const)("assigns a non-publishable review policy to %s", (filename, documentType, reviewPolicy) => {
+    const asset = registeredAsset({
+      observed_filename: filename,
+      mime_type: filename.endsWith(".xlsx")
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : filename.endsWith(".dwg") ? "application/acad" : "application/pdf",
+      synthetic_fingerprint: `synthetic:${documentType}-policy`,
+      linked_file_version_id: null,
+    }).assets[0]!;
+
+    expect(asset).toMatchObject({ document_type: documentType, review_policy: reviewPolicy });
+  });
+
+  it("requires a steward-reviewed summary before Senior publishes a reference document", () => {
+    const registered = registeredAsset({
+      observed_filename: "Synthetic_Cobalt_leasing_reference_202607.pdf",
+      mime_type: "application/pdf",
+      synthetic_fingerprint: "synthetic:leasing-reference-summary-gate",
+      linked_file_version_id: null,
+    });
+    const confirmed = confirm(registered);
+
+    expect(() => publish(confirmed)).toThrow(/reviewed summary/i);
+  });
 
   it("deduplicates exact synthetic fingerprints while retaining both observed names", () => {
     const first = registeredAsset();
@@ -107,6 +174,21 @@ describe("governed source asset registry", () => {
       "Cobalt_5F_plan_v1_20260718.svg",
       "renamed_current_plan.svg",
     ]);
+  });
+
+  it("rejects matching content fingerprints across different buildings", () => {
+    const first = registeredAsset();
+    expect(() => registerSourceAsset(first, {
+      id: "asset-plan-pacific-copy",
+      observed_filename: "Pacific_5F_plan.svg",
+      synthetic_fingerprint: "synthetic:plan-v1",
+      mime_type: "image/svg+xml",
+      byte_size: 1200,
+      building_alias_candidate: "Pacific Gate Tower",
+      building_id: "bld-pacific-gate",
+      source_organization: "Synthetic Asset Studio",
+      occurred_at: "2026-07-18T01:05:00.000Z",
+    })).toThrow(/different building or governance metadata/);
   });
 
   it("treats a filename date as artifact date, never effective date", () => {
@@ -191,13 +273,13 @@ describe("governed source asset registry", () => {
       mime_type: "application/pdf",
       linked_file_version_id: null,
     });
-    const oldPublished = publish(confirm(oldRegistered, "flyer-june"), "flyer-june");
+    const oldPublished = publish(confirm(oldRegistered, "flyer-june", true, "Reviewed June leasing flyer."), "flyer-june");
     const withNew = registerSourceAsset(oldPublished, {
       id: "flyer-july", observed_filename: "Cobalt_building_flyer_202607.pdf", synthetic_fingerprint: "synthetic:flyer-july",
       mime_type: "application/pdf", byte_size: 1500, building_alias_candidate: "Cobalt Finance Center", building_id: "bld-cobalt",
       source_organization: "Synthetic Asset Studio", occurred_at: "2026-07-19T01:00:00.000Z",
     });
-    const published = publish(confirm(withNew, "flyer-july"), "flyer-july");
+    const published = publish(confirm(withNew, "flyer-july", true, "Reviewed July leasing flyer."), "flyer-july");
 
     expect(published.assets.find((asset) => asset.id === "flyer-june")).toMatchObject({ status: "superseded", active: false });
     expect(published.assets.find((asset) => asset.id === "flyer-july")).toMatchObject({
@@ -206,6 +288,30 @@ describe("governed source asset registry", () => {
       version_family: "building-flyer:cobalt-building-flyer",
     });
     expect(selectExternallyVisibleAssets(published.assets).map((asset) => asset.id)).toEqual(["flyer-july"]);
+  });
+
+  it("fails closed when persisted publication flags conflict with a non-publishable review policy", () => {
+    const registered = registeredAsset({
+      id: "flyer-policy-conflict",
+      observed_filename: "Cobalt_building_flyer_202607.pdf",
+      synthetic_fingerprint: "synthetic:flyer-policy-conflict",
+      mime_type: "application/pdf",
+      linked_file_version_id: null,
+    });
+    const published = publish(confirm(
+      registered,
+      "flyer-policy-conflict",
+      true,
+      "Reviewed leasing flyer.",
+    ));
+    const corrupted = published.assets.map((asset) => ({
+      ...asset,
+      document_category: "legal_document" as const,
+      document_type: "legal_document" as const,
+      review_policy: "review_only" as const,
+    }));
+
+    expect(selectPublishedDocumentReferences(corrupted, ["bld-cobalt"])).toEqual([]);
   });
 
   it("admits only assets satisfying all five external gates", () => {

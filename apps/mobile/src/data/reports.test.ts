@@ -51,16 +51,19 @@ const view = {
   audit: [],
   labels: { mode: "DEMO", role: "LM Manager", delivery: "SANDBOX ONLY" },
 } as const satisfies MobileReportWorkflowView;
+const snapshot = { snapshot_version: 1, revision: 9, publication_stage: "published", scope: { building_ids: ["bld-cobalt"] },
+  published: { revision: 9, publication_stage: "published", building_id: "bld-cobalt" },
+  workflow: { revision: 9, publication_stage: "published", requests: [], packages: [], activities: [], audit: [] }, reports: view };
 
 describe("mobile weekly report HTTP adapter", () => {
   it("loads the curated report view from the normalized base URL", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(view), { status: 200 }));
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
     await expect(fetchMobileReports({ baseUrl: "https://demo.example/", fetcher })).resolves.toEqual(view);
     expect(view.reports[0]?.pending_candidate?.operations[0]).toMatchObject({
       section: "blocker_and_pending_approval",
       operation: "append",
     });
-    expect(fetcher).toHaveBeenCalledWith("https://demo.example/api/mobile/reports", {
+    expect(fetcher).toHaveBeenCalledWith("https://demo.example/api/operations/snapshot?actor_id=usr-manager", {
       headers: { Accept: "application/json" },
     });
   });
@@ -75,6 +78,21 @@ describe("mobile weekly report HTTP adapter", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       action: "approve",
       report_id: "report-1",
+      actor_id: "usr-manager",
+      expected_revision: 9,
+    });
+  });
+
+  it("sends the selected building when preparing a building-specific report", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(view), { status: 200 }));
+    await mutateMobileReports(9, { action: "draft", building_id: "bld-pacific-gate" }, {
+      baseUrl: "https://demo.example",
+      fetcher,
+    });
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      action: "draft",
+      building_id: "bld-pacific-gate",
       actor_id: "usr-manager",
       expected_revision: 9,
     });

@@ -17,6 +17,7 @@ import {
   type FileVersion,
   type GovernedPublicationState,
   type GovernedAssetRegistry,
+  type GovernedSourceAsset,
   type DraftMaterial,
   type OperationalState,
   type ReportSourceReference,
@@ -25,6 +26,8 @@ import {
   type WeeklyReportSections,
   type WeeklyReportState,
 } from "@leaseflow/domain";
+
+export * from "./operations-snapshot";
 
 export const DEMO_AS_OF = new Date("2026-07-18T12:00:00.000Z");
 
@@ -56,9 +59,22 @@ export const demoUsers = [
   { id: "usr-junior", email: "junior@demo.leaseflow.local", display_name: "Mina Lee", role: "data_steward" },
   { id: "usr-senior", email: "senior@demo.leaseflow.local", display_name: "Daniel Park", role: "senior_reviewer" },
   { id: "usr-manager", email: "manager@demo.leaseflow.local", display_name: "James Kim", role: "lm_manager" },
+  { id: "usr-lead", email: "lead@demo.leaseflow.local", display_name: "Sora Han", role: "team_lead" },
 ] as const satisfies readonly { id: string; email: string; display_name: string; role: UserRole }[];
 
 export type DemoUser = (typeof demoUsers)[number];
+
+export const demoWeeklyReportBuildings = [
+  { id: "bld-cobalt", name: "Cobalt Finance Center" },
+  { id: "bld-pacific-gate", name: "Pacific Gate Tower" },
+  { id: "bld-teheran-link", name: "Teheran Link" },
+] as const;
+
+export type DemoWeeklyReportBuildingId = (typeof demoWeeklyReportBuildings)[number]["id"];
+
+export function demoWeeklyReportBuildingName(buildingId: string): string | null {
+  return demoWeeklyReportBuildings.find((building) => building.id === buildingId)?.name ?? null;
+}
 
 export interface DemoRecord extends VersionedRecord {
   kind: "availability" | "term";
@@ -88,12 +104,60 @@ export type LegacyDemoStateV2 = Omit<DemoState, "schema_version" | "operations" 
   asset_registry?: GovernedAssetRegistry;
 };
 
+function hasCanonicalDocumentFields(asset: GovernedSourceAsset): boolean {
+  return typeof asset.content_fingerprint === "string"
+    && typeof asset.document_type === "string"
+    && typeof asset.source_format === "string"
+    && typeof asset.source_origin === "string"
+    && typeof asset.review_policy === "string"
+    && Object.prototype.hasOwnProperty.call(asset, "reviewed_summary");
+}
+
+export function migrateGovernedAssetRegistryToDocumentLifecycle(
+  registry: GovernedAssetRegistry,
+): GovernedAssetRegistry {
+  return {
+    assets: registry.assets.map((sourceAsset) => {
+      const asset = structuredClone(sourceAsset);
+      if (hasCanonicalDocumentFields(asset)) return asset;
+      if (typeof asset.synthetic_fingerprint !== "string") {
+        throw new Error(`Legacy source asset ${asset.id} is missing its synthetic fingerprint.`);
+      }
+      const inferred = registerSourceAsset({ assets: [] }, {
+        id: asset.id,
+        observed_filename: asset.observed_filenames[0]!,
+        synthetic_fingerprint: asset.synthetic_fingerprint,
+        mime_type: asset.mime_type,
+        byte_size: asset.byte_size,
+        building_alias_candidate: asset.building_alias_candidate,
+        building_id: asset.building_id,
+        source_organization: asset.source_organization,
+        linked_file_version_id: asset.linked_file_version_id,
+        occurred_at: asset.audit_provenance[0]?.occurred_at ?? "2026-07-18T00:00:00.000Z",
+      }).assets[0]!;
+      return {
+        ...inferred,
+        ...asset,
+        synthetic_fingerprint: asset.synthetic_fingerprint,
+        content_fingerprint: asset.synthetic_fingerprint,
+        document_type: inferred.document_type,
+        source_format: inferred.source_format,
+        source_origin: "synthetic_seed",
+        review_policy: inferred.review_policy,
+        reviewed_summary: null,
+      };
+    }),
+  };
+}
+
 export function migrateDemoStateToV3(state: DemoState | LegacyDemoStateV2): DemoState {
   const cloned = structuredClone(state);
   return {
     ...cloned,
     schema_version: 3,
-    asset_registry: cloned.asset_registry ?? createInitialAssetRegistry(),
+    asset_registry: migrateGovernedAssetRegistryToDocumentLifecycle(
+      cloned.asset_registry ?? createInitialAssetRegistry(),
+    ),
     operations: {
       ...cloned.operations,
       reports: "reports" in cloned.operations ? cloned.operations.reports : createInitialWeeklyReportState(),
@@ -545,6 +609,46 @@ export const demoMockOutlookMessages = [
     body: "Approved package prepared and sent through LeaseFlow sandbox.",
     share_scope: "external_reportable",
   },
+  {
+    id: "mail-pacific-001",
+    building_id: "bld-pacific-gate",
+    thread_id: "thread-pacific-gate",
+    occurred_at: "2026-07-16T10:15:00+09:00",
+    direction: "inbound",
+    subject: "Pacific Gate Tower leasing tour update",
+    body: "The tenant tour is confirmed for Friday and the current leasing overview may be shared.",
+    share_scope: "external_reportable",
+  },
+  {
+    id: "mail-pacific-002",
+    building_id: "bld-pacific-gate",
+    thread_id: "thread-pacific-gate",
+    occurred_at: "2026-07-17T16:20:00+09:00",
+    direction: "inbound",
+    subject: "Pacific Gate draft commercial discussion",
+    body: "A confidential draft incentive is under internal review and must not enter the landlord report.",
+    share_scope: "client_confidential",
+  },
+  {
+    id: "mail-teheran-001",
+    building_id: "bld-teheran-link",
+    thread_id: "thread-teheran-link",
+    occurred_at: "2026-07-17T11:40:00+09:00",
+    direction: "outbound",
+    subject: "Teheran Link leasing inquiry status",
+    body: "The current availability summary was shared with the approved prospect contact.",
+    share_scope: "external_reportable",
+  },
+  {
+    id: "mail-teheran-002",
+    building_id: "bld-teheran-link",
+    thread_id: "thread-teheran-link",
+    occurred_at: "2026-07-18T08:50:00+09:00",
+    direction: "inbound",
+    subject: "Teheran Link internal negotiation note",
+    body: "Internal negotiation thresholds are confidential and must not enter the landlord report.",
+    share_scope: "client_confidential",
+  },
 ] as const satisfies readonly DemoMockOutlookMessage[];
 
 function isExternalReportableDemoOutlookMessage(
@@ -633,7 +737,119 @@ const demoLeaseFlowReportSource: ReportSourceReference = {
   summary: "Broker requested current 5F package",
 };
 
-export function createDemoWeeklyReportDraftInput(): CreateWeeklyReportDraftInput {
+const additionalWeeklyReportDrafts = {
+  "bld-pacific-gate": {
+    id: "report-pacific-gate-2026-w29",
+    building_id: "bld-pacific-gate",
+    building_name: "Pacific Gate Tower",
+    sections: {
+      key_issue: "Friday tenant tour and current leasing overview delivery.",
+      changes_since_last_report: ["Tenant tour confirmed for Friday"],
+      activity_summary: ["Current leasing overview prepared for the confirmed tour"],
+      negotiated_area_floor_changes: [],
+      competitor_buildings: [],
+      blocker_and_pending_approval: ["No external-reportable blocker recorded"],
+      next_actions: [{ action: "Confirm tour attendance", owner: "LM Manager", due_date: "2026-07-20" }],
+    },
+    source: {
+      id: "activity-tour-pacific-gate",
+      source_type: "leaseflow_activity",
+      building_id: "bld-pacific-gate",
+      occurred_at: "2026-07-18T10:30:00+09:00",
+      share_scope: "external_reportable",
+      summary: "Tenant tour preparation recorded",
+    },
+    attachment: {
+      id: "attachment-pacific-gate-leasing-v1",
+      building_id: "bld-pacific-gate",
+      version_id: "file-pacific-gate-leasing-v1",
+      filename: "PGT_leasing_overview_v1.pdf",
+    },
+    material_version_ids: ["record-pacific-gate-availability-v1"],
+    recipients: {
+      configuration_id: "hanbit-weekly-bld-pacific-gate-v1",
+      to: [{ email: "hanbit.leasing@example.test", role: "to_landlord_practical" }],
+      cc: [
+        { email: "hanbit.asset@example.test", role: "cc_landlord_team" },
+        { email: "hanbit.executive@example.test", role: "cc_landlord_exec" },
+        { email: "lease.team@example.test", role: "cc_lm_team" },
+        { email: "lease.manager@example.test", role: "cc_lm_exec" },
+      ],
+    },
+  },
+  "bld-teheran-link": {
+    id: "report-teheran-link-2026-w29",
+    building_id: "bld-teheran-link",
+    building_name: "Teheran Link",
+    sections: {
+      key_issue: "Current availability inquiry follow-up.",
+      changes_since_last_report: ["Approved availability summary shared with prospect contact"],
+      activity_summary: ["Prospect inquiry follow-up recorded"],
+      negotiated_area_floor_changes: [],
+      competitor_buildings: [],
+      blocker_and_pending_approval: ["No external-reportable blocker recorded"],
+      next_actions: [{ action: "Confirm prospect response", owner: "LM Manager", due_date: "2026-07-21" }],
+    },
+    source: {
+      id: "activity-inquiry-teheran-link",
+      source_type: "leaseflow_activity",
+      building_id: "bld-teheran-link",
+      occurred_at: "2026-07-18T09:10:00+09:00",
+      share_scope: "external_reportable",
+      summary: "Prospect inquiry follow-up recorded",
+    },
+    attachment: {
+      id: "attachment-teheran-link-availability-v1",
+      building_id: "bld-teheran-link",
+      version_id: "file-teheran-link-availability-v1",
+      filename: "TL_availability_summary_v1.pdf",
+    },
+    material_version_ids: ["record-teheran-link-availability-v1"],
+    recipients: {
+      configuration_id: "seorin-biweekly-bld-teheran-link-v1",
+      to: [{ email: "seorin.operations@example.test", role: "to_landlord_practical" }],
+      cc: [
+        { email: "seorin.team@example.test", role: "cc_landlord_team" },
+        { email: "seorin.executive@example.test", role: "cc_landlord_exec" },
+        { email: "lease.team@example.test", role: "cc_lm_team" },
+        { email: "lease.manager@example.test", role: "cc_lm_exec" },
+      ],
+    },
+  },
+} as const satisfies Record<Exclude<DemoWeeklyReportBuildingId, "bld-cobalt">, {
+  id: string;
+  building_id: DemoWeeklyReportBuildingId;
+  building_name: string;
+  sections: WeeklyReportSections;
+  source: ReportSourceReference;
+  attachment: { id: string; building_id: string; version_id: string; filename: string };
+  material_version_ids: readonly string[];
+  recipients: ConfiguredReportRecipients;
+}>;
+
+export function createDemoWeeklyReportDraftInput(
+  buildingId: DemoWeeklyReportBuildingId = "bld-cobalt",
+): CreateWeeklyReportDraftInput {
+  if (buildingId !== "bld-cobalt") {
+    const fixture = additionalWeeklyReportDrafts[buildingId];
+    return structuredClone({
+      id: fixture.id,
+      building_id: fixture.building_id,
+      reporting_period: demoWeeklyReportExpected.reporting_period,
+      sections: fixture.sections,
+      sources: [
+        fixture.source,
+        ...selectExternalReportableMockOutlook(demoMockOutlookMessages, buildingId),
+      ],
+      attachments: [fixture.attachment],
+      material_version_ids: [...fixture.material_version_ids],
+      recipients: fixture.recipients,
+      cover: {
+        subject: `[Weekly Report] ${fixture.building_name} 2026-07-13–2026-07-18`,
+        body: "Please find the approved building-specific weekly report attached.",
+      },
+    } satisfies CreateWeeklyReportDraftInput);
+  }
   const recipients: ConfiguredReportRecipients = {
     configuration_id: demoWeeklyReportRecipientGroup.configuration_id,
     to: demoWeeklyReportRecipientGroup.to.map(({ email, role }) => ({ email, role })),

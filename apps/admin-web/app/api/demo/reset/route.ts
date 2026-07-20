@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDemoStore } from "@/lib/demo-store.server";
 import { assertDemoMode } from "@/lib/demo-mode.server";
 import { mutationError, parseMutationRequest } from "@/lib/api-response";
+import { DemoResetCoordinator } from "@/lib/demo-reset.server";
 
 const demoCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,8 +25,9 @@ export async function POST(request: Request) {
   try {
     assertDemoMode();
     const input = await parseMutationRequest(request);
+    const state = await new DemoResetCoordinator().reset(input);
     return NextResponse.json(
-      { state: await getDemoStore().reset(input) },
+      { state },
       { headers: demoCorsHeaders },
     );
   } catch (error) {

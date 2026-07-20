@@ -99,12 +99,12 @@ The role switcher is a demo control. Production authentication, SSO, and account
 
 ## Verification snapshot
 
-Current local verification on 2026-07-19, after milestone commit `b7f7e90`:
+Current local verification on 2026-07-20, with milestone history through commit `7435e87` and the current working tree:
 
-- 126 tests passed: reset CLI 2, Admin 57, Mobile 10, AI 9, Demo Data 11, Domain 37;
+- 289 tests passed: reset CLI 2, Admin 201, Mobile 18, AI 9, Demo Data 15, Domain 44;
 - all five npm workspaces passed strict TypeScript checks;
 - repository validation passed;
-- the 13-route Admin production build passed;
+- the 32-page Admin production build passed;
 - Expo Web export passed; earlier iOS and Android exports also passed;
 - production HTTP, revision-aware reset, CORS, and real-browser QA passed;
 - the final cleanup QA checked Admin at 375, 768, and 1280 px with no horizontal overflow or browser-console errors; the Stage 5 Admin and Mobile pass covered 320, 375, 768, and 1280 px;
@@ -132,4 +132,4 @@ The reproducible local video is [LeaseFlow_Hackathon_Demo_KO.mp4](artifacts/subm
 - Demo video URL: `[PENDING: public narrated video URL, 3:00 maximum]`
 - Primary Codex session ID: `019f7335-4b59-7e81-8131-b31800757887`
 
-Submission drafts and remaining owner actions are tracked in [Devpost Copy](docs/DEVPOST_COPY.md) and the [Submission Checklist](docs/SUBMISSION_CHECKLIST.md).
+The canonical English form answers, full write-up, demo narration, and `Codex for Everyone` concept are in the [OpenAI Build Week Submission Master](docs/submission/LeaseFlow_OpenAI_Build_Week_Submission_Master_EN.md). Remaining owner actions are tracked in the [Submission Checklist](docs/SUBMISSION_CHECKLIST.md).

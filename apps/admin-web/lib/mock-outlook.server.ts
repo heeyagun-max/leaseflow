@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   createDemoWeeklyReportDraftInput,
+  demoWeeklyReportBuildings,
   selectExternalReportableMockOutlook,
   type DemoMockOutlookMessage,
 } from "@leaseflow/demo-data";
@@ -53,8 +54,12 @@ export async function loadExternalReportableMockOutlook(input: {
     }));
 }
 
-export async function loadCanonicalWeeklyReportDraft(): Promise<CreateWeeklyReportDraftInput> {
-  const draft = createDemoWeeklyReportDraftInput();
+export async function loadCanonicalWeeklyReportDraft(
+  buildingId = "bld-cobalt",
+): Promise<CreateWeeklyReportDraftInput> {
+  const building = demoWeeklyReportBuildings.find((candidate) => candidate.id === buildingId);
+  if (!building) throw new Error(`Unknown demo weekly-report building: ${buildingId}.`);
+  const draft = createDemoWeeklyReportDraftInput(building.id);
   const outlook = await loadExternalReportableMockOutlook({
     buildingId: draft.building_id,
     period: draft.reporting_period,

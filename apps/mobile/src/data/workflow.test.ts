@@ -2,12 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { fetchMobileWorkflow, mutateMobileWorkflow } from "./workflow";
 
 const view = { revision: 7, publication_stage: "published", requests: [], packages: [], activities: [], audit: [], labels: { mode: "DEMO", role: "LM Manager", delivery: "SANDBOX ONLY" } } as const;
+const snapshot = { snapshot_version: 1, revision: 7, publication_stage: "published", scope: { building_ids: ["bld-cobalt"] },
+  published: { revision: 7, publication_stage: "published", building_id: "bld-cobalt" }, workflow: view,
+  reports: { revision: 7, publication_stage: "published", reports: [], activities: [], audit: [] } };
 
 describe("mobile workflow HTTP adapter", () => {
   it("loads the curated response from the configured base URL", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(view), { status: 200 }));
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
     await expect(fetchMobileWorkflow({ baseUrl: "https://demo.example/", fetcher })).resolves.toEqual(view);
-    expect(fetcher).toHaveBeenCalledWith("https://demo.example/api/mobile/workflow", { headers: { Accept: "application/json" } });
+    expect(fetcher).toHaveBeenCalledWith("https://demo.example/api/operations/snapshot?actor_id=usr-manager", { headers: { Accept: "application/json" } });
   });
 
   it("sends the LM Manager actor and expected revision", async () => {

@@ -6,6 +6,7 @@ import {
   createReportWorkflowService,
   toPublicReportWorkflow,
 } from "@/lib/report-workflow-public.server";
+import { loadDemoRuntimeConfiguration, WorkflowAccessError } from "@/lib/demo-store.server";
 import { classifyWorkflowError } from "@/lib/workflow-error.server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,11 @@ const commonFields = {
 };
 
 const actionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("draft"), ...commonFields }).strict(),
+  z.object({
+    action: z.literal("draft"),
+    building_id: z.enum(["bld-cobalt", "bld-pacific-gate", "bld-teheran-link"]),
+    ...commonFields,
+  }).strict(),
   z.object({
     action: z.literal("investigate"),
     report_id: z.string().min(1),
@@ -54,6 +59,15 @@ function reportError(error: unknown) {
   return json(response.body, response.status);
 }
 
+function authorizedBuildingIds(
+  configuration: Awaited<ReturnType<typeof loadDemoRuntimeConfiguration>>,
+  actorId: string,
+): string[] {
+  const buildingIds = configuration.access.users.find((entry) => entry.user_id === actorId)?.building_ids;
+  if (!buildingIds) throw new WorkflowAccessError("현재 사용자의 건물 권한을 찾을 수 없습니다.");
+  return buildingIds;
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: responseHeaders });
 }
@@ -61,10 +75,27 @@ export async function OPTIONS() {
 export async function GET(request: Request) {
   try {
     assertDemoMode();
-    const actorId = new URL(request.url).searchParams.get("actor_id");
+    const searchParams = new URL(request.url).searchParams;
+    const actorId = searchParams.get("actor_id");
     if (!actorId) throw new Error("Unknown demo actor: missing actor_id.");
     const service = createReportWorkflowService();
-    return json(toPublicReportWorkflow(await service.getState(), actorId));
+    const [state, configuration] = await Promise.all([service.getState(), loadDemoRuntimeConfiguration()]);
+    const projection = toPublicReportWorkflow(state, actorId, authorizedBuildingIds(configuration, actorId));
+    const reportId = searchParams.get("report_id");
+    if (!reportId) return json(projection);
+    const selected = projection.reports.find((report) => report.id === reportId);
+    if (!selected) {
+      if (state.operations.reports.reports.some((report) => report.id === reportId)) {
+        throw new WorkflowAccessError("이 건물 보고를 볼 권한이 없습니다.");
+      }
+      throw new Error(`Unknown weekly report: ${reportId}.`);
+    }
+    return json({
+      ...projection,
+      reports: [selected],
+      activities: projection.activities.filter((activity) => activity.report_id === selected.id),
+      audit: projection.audit.filter((event) => event.report_id === selected.id),
+    });
   } catch (error) {
     return reportError(error);
   }
@@ -93,7 +124,8 @@ export async function POST(request: Request) {
         state = await service.send(input);
         break;
     }
-    return json(toPublicReportWorkflow(state, input.actor_id));
+    const configuration = await loadDemoRuntimeConfiguration();
+    return json(toPublicReportWorkflow(state, input.actor_id, authorizedBuildingIds(configuration, input.actor_id)));
   } catch (error) {
     return reportError(error);
   }

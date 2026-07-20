@@ -2,8 +2,20 @@
   "configuration_id": "building-access-demo-v1",
   "users": [
     {
-      "user_id": "usr-manager",
+      "user_id": "usr-junior",
       "building_ids": ["bld-cobalt"]
+    },
+    {
+      "user_id": "usr-senior",
+      "building_ids": ["bld-cobalt", "bld-pacific-gate"]
+    },
+    {
+      "user_id": "usr-manager",
+      "building_ids": ["bld-cobalt", "bld-pacific-gate", "bld-teheran-link"]
+    },
+    {
+      "user_id": "usr-lead",
+      "building_ids": ["bld-cobalt", "bld-pacific-gate", "bld-teheran-link"]
     }
   ]
 }

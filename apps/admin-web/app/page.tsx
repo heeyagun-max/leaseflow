@@ -1,3 +1,3 @@
-import { AdminPage } from "@/components/governance/admin-pages";
+import { ServiceHome } from "@/components/unified/service-pages";
 
-export default function Page() { return <AdminPage view="home" />; }
+export default function Page() { return <ServiceHome />; }

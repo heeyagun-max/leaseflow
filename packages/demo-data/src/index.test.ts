@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import { createInitialWeeklyReportState, createWeeklyReportDraft } from "@leaseflow/domain";
 
 import {
+  createDemoDraftMaterial,
   createMobilePublishedSnapshot,
+  createPublicOperationsSnapshot,
   createDemoWeeklyReportDraftInput,
   createInitialDemoState,
   currentDemoWeeklyReportMaterialIds,
@@ -15,6 +17,7 @@ import {
   migrateDemoStateToV3,
   selectExternalReportableMockOutlook,
   type LegacyDemoStateV2,
+  parsePublicOperationsSnapshot,
 } from "./index";
 
 const fixtureRoot = fileURLToPath(new URL("../../../data/demo/", import.meta.url));
@@ -75,6 +78,18 @@ describe("persistent demo state schema v3", () => {
 });
 
 describe("synthetic governed asset registry projection", () => {
+  it("labels every checked-in document source as synthetic without persisting raw document content", () => {
+    const state = createInitialDemoState();
+    const serialized = JSON.stringify(state);
+
+    expect(state.asset_registry.assets.every((asset) => (
+      (asset as unknown as { source_origin?: string }).source_origin === "synthetic_seed"
+    ))).toBe(true);
+    for (const forbidden of ["raw_bytes", "raw_text", "normalized_text", "private_asset_path"]) {
+      expect(serialized).not.toContain(`\"${forbidden}\"`);
+    }
+  });
+
   it("keeps the checked-in synthetic registration fixture aligned with typed seed inputs", () => {
     expect(readFixture("source_asset_registry.json")).toEqual(demoAssetRegistrationInputs);
   });
@@ -113,6 +128,107 @@ describe("synthetic governed asset registry projection", () => {
     });
 
     expect(createMobilePublishedSnapshot(state).source_assets.map((asset) => asset.filename)).toEqual(["CFC_5F_plan_v1.svg"]);
+  });
+
+  it("keeps reviewed references top-level and never auto-attaches them to customer material", () => {
+    const state = createInitialDemoState();
+    const base = state.asset_registry.assets.find((asset) => asset.id === "asset-cobalt-flyer")!;
+    state.asset_registry.assets.push(...([
+      {
+        ...base,
+        id: "doc-published-current",
+        document_type: "leasing_flyer",
+        status: "published",
+        active: true,
+        authorized: true,
+        externally_shareable: true,
+        reviewed_summary: "Synthetic leasing reference summary.",
+        content_fingerprint: "sha256:private-fingerprint",
+        candidate_text: "private extracted candidate text",
+        stored_filename: "private-runtime-name.pdf",
+        reviewer: "usr-junior",
+        source_origin: "synthetic_seed",
+      },
+      {
+        ...base,
+        id: "doc-unreviewed",
+        document_type: "leasing_flyer",
+        status: "published",
+        active: true,
+        authorized: true,
+        externally_shareable: true,
+        reviewed_summary: null,
+        source_origin: "synthetic_seed",
+      },
+      {
+        ...base,
+        id: "doc-private-qa",
+        document_type: "leasing_flyer",
+        status: "published",
+        active: true,
+        authorized: true,
+        externally_shareable: true,
+        reviewed_summary: "Private QA summary",
+        source_origin: "ephemeral_private_qa",
+      },
+    ] as unknown as typeof state.asset_registry.assets));
+
+    const material = createDemoDraftMaterial(state);
+    const published = createMobilePublishedSnapshot(state);
+    const workflow = { revision: 0, publication_stage: published.publication_stage, requests: [], packages: [], activities: [], audit: [] };
+    const reports = { revision: 0, publication_stage: published.publication_stage, reports: [], activities: [], audit: [] };
+    const publicDocument = {
+      building_id: "bld-cobalt",
+      document_type: "leasing_flyer",
+      reviewed_summary: "Synthetic leasing reference summary.",
+    };
+    const snapshot = createPublicOperationsSnapshot({
+      authorized_building_ids: ["bld-cobalt"], published, workflow, reports,
+      published_documents: [publicDocument],
+    } as unknown as Parameters<typeof createPublicOperationsSnapshot>[0]) as unknown as {
+      published_documents?: Array<Record<string, unknown>>;
+    };
+
+    expect(JSON.stringify(material)).not.toContain("doc-published-current");
+    expect(snapshot.published_documents).toEqual([publicDocument]);
+    const serialized = JSON.stringify(snapshot.published_documents);
+    for (const forbidden of ["candidate_text", "content_fingerprint", "stored_filename", "reviewer"]) {
+      expect(serialized).not.toContain(`\"${forbidden}\"`);
+    }
+  });
+});
+
+describe("shared public operations snapshot", () => {
+  it("locks all public surfaces to one authorized canonical revision", () => {
+    const published = createMobilePublishedSnapshot(createInitialDemoState());
+    const workflow = { revision: 0, publication_stage: published.publication_stage, requests: [], packages: [], activities: [], audit: [] };
+    const reports = { revision: 0, publication_stage: published.publication_stage, reports: [], activities: [], audit: [] };
+
+    const snapshot = createPublicOperationsSnapshot({
+      authorized_building_ids: ["bld-cobalt"], published, workflow, reports,
+    });
+
+    expect(parsePublicOperationsSnapshot(snapshot)).toEqual(snapshot);
+    expect(snapshot).toMatchObject({
+      snapshot_version: 1,
+      revision: 0,
+      scope: { building_ids: ["bld-cobalt"] },
+      published: { building_id: "bld-cobalt", floor_plan: { filename: "CFC_5F_plan_v1.svg" } },
+    });
+  });
+
+  it("fails closed on revision drift, unauthorized buildings, and internal fields", () => {
+    const published = createMobilePublishedSnapshot(createInitialDemoState());
+    const workflow = { revision: 0, publication_stage: published.publication_stage, requests: [], packages: [], activities: [], audit: [] };
+    const reports = { revision: 1, publication_stage: published.publication_stage, reports: [], activities: [], audit: [] };
+    expect(() => createPublicOperationsSnapshot({ authorized_building_ids: ["bld-cobalt"], published, workflow, reports }))
+      .toThrow("one canonical revision");
+    expect(() => createPublicOperationsSnapshot({ authorized_building_ids: ["bld-foreign"], published, workflow, reports: { ...reports, revision: 0 } }))
+      .toThrow("not authorized");
+    expect(() => parsePublicOperationsSnapshot({
+      ...createPublicOperationsSnapshot({ authorized_building_ids: ["bld-cobalt"], published, workflow, reports: { ...reports, revision: 0 } }),
+      workflow: { ...workflow, raw_text: "must not escape" },
+    })).toThrow("forbidden public field");
   });
 });
 

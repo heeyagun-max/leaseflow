@@ -6,10 +6,10 @@ import { AdminShell } from "@/components/governance/admin-shell";
 
 export const metadata: Metadata = {
   title: {
-    default: "LeaseFlow 자산 운영",
+    default: "LeaseFlow Operations",
     template: "%s · LeaseFlow",
   },
-  description: "임대 자산 정보와 주간 업무를 한곳에서 관리합니다.",
+  description: "Manage current leasing data, requests, and weekly landlord reports in one governed workspace.",
 };
 
 export const viewport: Viewport = {
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     process.env.NEXT_PUBLIC_DISABLE_REACT_DEVTOOLS !== "1";
 
   return (
-    <html lang="ko">
+    <html lang="en">
       <head>
         {enableDevTools ? (
           <>

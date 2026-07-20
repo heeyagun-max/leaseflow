@@ -1,0 +1,1 @@
+Weekly reporting is organized by landlord, because one landlord meeting can cover several buildings. The team configures the buildings, meeting schedule, required sections, owners, approvers, and recipient group once. LeaseFlow then gathers the week’s approved building activity into reports that remain building specific and human approved.

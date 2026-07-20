@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SourceCandidateSchema } from "@leaseflow/ai";
 import { renderOperationalPackageBody } from "@leaseflow/domain";
 import {
+  createDemoDraftMaterial,
   createInitialDemoState,
   createMobilePublishedSnapshot,
   demoExtractionResult,
@@ -125,6 +126,108 @@ describe("persistent governed demo store", () => {
     expect(createMobilePublishedSnapshot(assetPublished).source_assets.map((asset) => asset.filename)).toEqual(["CFC_5F_plan_v2.svg"]);
   });
 
+  it("increments one canonical revision per document action without changing official material", async () => {
+    const { store, statePath } = await storeFixture();
+    const initial = await store.getState();
+    const official = {
+      stage: initial.stage,
+      candidates: initial.candidates,
+      records: initial.records,
+      files: initial.files,
+      material: createDemoDraftMaterial(initial),
+    };
+    const registered = await store.registerDocumentAsset({
+      actor_id: "usr-junior",
+      expected_revision: initial.revision,
+      id: "doc-cobalt-leasing-july",
+      observed_filename: "Synthetic_Cobalt_leasing_flyer_202607.pdf",
+      synthetic_fingerprint: "synthetic:doc-cobalt-leasing-july",
+      content_fingerprint: "sha256:doc-cobalt-leasing-july",
+      mime_type: "application/pdf",
+      byte_size: 2400,
+      building_alias_candidate: "Cobalt Finance Center",
+      building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Management",
+      document_type: "leasing_flyer",
+      source_format: "pdf",
+      source_origin: "ephemeral_private_qa",
+      review_policy: "publishable_reference",
+      reviewed_summary: null,
+      candidate_summary: "This candidate must not be persisted.",
+      occurred_at: "2026-07-20T01:00:00.000Z",
+    });
+    expect(registered.revision).toBe(initial.revision + 1);
+    expect(registered.asset_registry.assets.at(-1)).toMatchObject({
+      id: "doc-cobalt-leasing-july",
+      status: "registered",
+      reviewed_summary: null,
+    });
+    expect(JSON.stringify(registered)).not.toContain("candidate_summary");
+
+    const reviewed = await store.reviewDocumentAsset({
+      actor_id: "usr-junior",
+      expected_revision: registered.revision,
+      document_id: "doc-cobalt-leasing-july",
+      reviewed_summary: "Reviewed synthetic leasing reference.",
+      occurred_at: "2026-07-20T01:01:00.000Z",
+    });
+    expect(reviewed.revision).toBe(registered.revision + 1);
+    const published = await store.publishDocumentAsset({
+      actor_id: "usr-senior",
+      expected_revision: reviewed.revision,
+      document_id: "doc-cobalt-leasing-july",
+      occurred_at: "2026-07-20T01:02:00.000Z",
+    });
+    expect(published.revision).toBe(reviewed.revision + 1);
+    expect(published.asset_registry.assets.at(-1)).toMatchObject({
+      status: "published",
+      active: true,
+      authorized: true,
+      externally_shareable: true,
+      reviewed_summary: "Reviewed synthetic leasing reference.",
+    });
+    for (const state of [registered, reviewed, published]) {
+      expect({
+        stage: state.stage,
+        candidates: state.candidates,
+        records: state.records,
+        files: state.files,
+        material: createDemoDraftMaterial(state),
+      }).toEqual(official);
+    }
+    await expect(store.reviewDocumentAsset({
+      actor_id: "usr-junior",
+      expected_revision: registered.revision,
+      document_id: "doc-cobalt-leasing-july",
+      reviewed_summary: "Stale review.",
+    })).rejects.toThrow(/Revision conflict/);
+    await expect(new DemoFileStore(statePath).getState()).resolves.toEqual(published);
+  });
+
+  it("rejects raw document text at the state boundary", async () => {
+    const { store } = await storeFixture();
+    const initial = await store.getState();
+    const unsafe = {
+      actor_id: "usr-junior",
+      expected_revision: initial.revision,
+      id: "doc-unsafe",
+      observed_filename: "Synthetic_Cobalt_leasing_flyer.pdf",
+      content_fingerprint: "sha256:doc-unsafe",
+      mime_type: "application/pdf",
+      byte_size: 10,
+      building_alias_candidate: "Cobalt Finance Center",
+      building_id: "bld-cobalt",
+      source_organization: "Synthetic Asset Management",
+      document_type: "leasing_flyer",
+      source_format: "pdf",
+      source_origin: "ephemeral_private_qa",
+      raw_text: "must not persist",
+    } as Parameters<DemoFileStore["registerDocumentAsset"]>[0] & { raw_text: string };
+
+    await expect(store.registerDocumentAsset(unsafe)).rejects.toThrow(/cannot persist raw_text/);
+    await expect(store.getState()).resolves.toEqual(initial);
+  });
+
   it("persists only schema-valid mapped extraction candidates", async () => {
     const { store } = await storeFixture();
     const initial = await store.getState();
@@ -171,6 +274,43 @@ describe("persistent governed demo store", () => {
     expect(migrated.asset_registry.assets.length).toBeGreaterThan(0);
     const persisted = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>;
     expect(persisted).toHaveProperty("asset_registry");
+  });
+
+  it("enriches legacy schema-v3 asset fingerprints in place", async () => {
+    const { store, statePath } = await storeFixture();
+    const legacy = createInitialDemoState() as unknown as {
+      asset_registry: { assets: Array<Record<string, unknown>> };
+      records: unknown;
+      files: unknown;
+    };
+    for (const asset of legacy.asset_registry.assets) {
+      delete asset.content_fingerprint;
+      delete asset.document_type;
+      delete asset.source_format;
+      delete asset.source_origin;
+      delete asset.review_policy;
+      delete asset.reviewed_summary;
+    }
+    await writeFile(statePath, JSON.stringify(legacy), "utf8");
+
+    const migrated = await store.getState();
+    expect(migrated.records).toEqual(legacy.records);
+    expect(migrated.files).toEqual(legacy.files);
+    expect(migrated.asset_registry.assets.every((asset) => (
+      asset.content_fingerprint === asset.synthetic_fingerprint
+      && asset.source_origin === "synthetic_seed"
+    ))).toBe(true);
+    const persisted = JSON.parse(await readFile(statePath, "utf8")) as {
+      asset_registry: { assets: Array<Record<string, unknown>> };
+    };
+    expect(persisted.asset_registry.assets.every((asset) => [
+      "content_fingerprint",
+      "document_type",
+      "source_format",
+      "source_origin",
+      "review_policy",
+      "reviewed_summary",
+    ].every((key) => key in asset))).toBe(true);
   });
 
   it("scopes current and blocked mobile data to the Cobalt 5F field and file type", () => {

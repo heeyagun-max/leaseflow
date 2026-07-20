@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>LeaseFlow</title>
+  <style>
+    :root{
+      --bg:#F3F5F7;--surface:#FFFFFF;--ink:#17212B;--rail:#16202A;--muted:#687483;
+      --border:#D8DEE6;--accent:#355F9C;--selected:#E8EEF7;--success:#2F6B55;
+      --success-soft:#E7F1EC;--warning:#946A26;--warning-soft:#F8EDD9;--error:#A33D3D;
+      --error-soft:#F8E8E7;--disabled:#EEF1F4;--radius-sm:6px;--radius:8px;--radius-lg:10px;
+      --safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px)
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    html{background:var(--bg);color:var(--ink);font-family:"Pretendard Variable","Pretendard","Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+    body{margin:0;background:#E4E8EC;font-size:15px;line-height:1.5;word-break:keep-all}
+    button,input{font:inherit;color:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:not-allowed}
+    :focus-visible{outline:3px solid rgba(53,95,156,.38);outline-offset:2px}
+    h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus,main[tabindex="-1"]:focus{outline:none}
+    .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+    .skip{position:fixed;z-index:100;inset-block-start:8px;inset-inline-start:8px;min-height:44px;padding:10px 14px;border-radius:6px;background:var(--surface);color:var(--accent);transform:translateY(-140%)}
+    .skip:focus{transform:none}
+    .stage{min-height:100dvh;display:grid;place-items:center;padding:24px}
+    .phone{position:relative;width:min(100%,430px);height:min(900px,calc(100dvh - 48px));min-height:640px;overflow:hidden;border:7px solid var(--rail);border-radius:32px;background:var(--bg);box-shadow:0 18px 50px rgba(22,32,42,.18)}
+    .appbar{height:calc(56px + var(--safe-top));padding:var(--safe-top) 16px 0;display:flex;align-items:center;justify-content:space-between;background:var(--rail);color:#fff}
+    .brand{font-size:18px;font-weight:760;letter-spacing:-.03em}
+    .profile,.icon-button{display:inline-grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:transparent;color:#fff}
+    .profile{font-size:12px;font-weight:750}
+    svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .viewport{height:calc(100% - 56px - var(--safe-top) - 64px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior-y:contain;scroll-padding-block:16px}
+    .viewport::-webkit-scrollbar{display:none}
+    .screen{display:none;padding:14px 14px 28px}
+    .screen.active{display:block}
+    .page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-block:0 12px}
+    .page-head h1{margin:0;font-size:clamp(22px,6vw,26px);line-height:1.25;letter-spacing:-.025em;font-weight:720;text-wrap:balance}
+    .page-head .date{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+    .section{margin-block-start:16px;min-width:0}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-block-end:8px}
+    .section-head h2{margin:0;font-size:16px;line-height:1.35;font-weight:680;letter-spacing:-.015em}
+    .count,.muted{color:var(--muted);font-size:12px}
+    .composer{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px;align-items:center;padding:6px;border:1px solid #BCC7D3;border-radius:10px;background:var(--surface)}
+    .composer input{width:100%;height:44px;padding:0 5px;border:0;background:transparent;outline:0;min-width:0}
+    .composer input::placeholder{color:#7A8795}
+    .composer button{width:44px;height:44px;padding:0;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:var(--muted)}
+    .composer .send{background:var(--accent);color:#fff}
+    .result{margin-block-start:8px;padding:10px 12px;border-inline-start:2px solid var(--accent);border-block:1px solid var(--border);border-inline-end:1px solid var(--border);border-radius:6px;background:var(--surface)}
+    .result strong,.result span{display:block}
+    .result strong{font-size:14px}
+    .result span{margin-block-start:2px;color:var(--muted);font-size:12px}
+    .task-list{display:grid;border-block-start:1px solid var(--border)}
+    .task-row{width:100%;min-height:62px;padding:9px 8px;border:0;border-block-end:1px solid var(--border);background:transparent;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;text-align:start}
+    .task-row.selected{background:var(--selected);box-shadow:inset 2px 0 var(--accent)}
+    .task-row strong,.task-row small{display:block;overflow-wrap:anywhere}
+    .task-row strong{font-size:14px;font-weight:680}
+    .task-row small{margin-block-start:2px;color:var(--muted);font-size:12px}
+    .task-row .state{text-align:end}
+    .status{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:680;white-space:nowrap}
+    .status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+    .status.warning{color:var(--warning);background:var(--warning-soft)}
+    .status.success{color:var(--success);background:var(--success-soft)}
+    .status.info{color:var(--accent);background:var(--selected)}
+    .status.error{color:var(--error);background:var(--error-soft)}
+    .building-strip{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-block:1px 8px;scrollbar-width:none}
+    .building-strip::-webkit-scrollbar{display:none}
+    .building-card{flex:0 0 min(78vw,284px);min-height:122px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);scroll-snap-align:start;text-align:start}
+    .building-card[aria-current="true"]{border-color:var(--accent);box-shadow:inset 2px 0 var(--accent)}
+    .building-card strong,.building-card small{display:block}
+    .building-card strong{font-size:15px;font-weight:700}
+    .building-card small{margin-block-start:2px;color:var(--muted);font-size:12px}
+    .building-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-block-start:10px;padding-block-start:8px;border-block-start:1px solid var(--border)}
+    .building-facts span{font-size:12px;color:var(--muted)}
+    .building-facts b{display:block;color:var(--ink);font-size:13px;font-weight:680;font-variant-numeric:tabular-nums}
+    .inline-alert{width:100%;min-height:56px;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;text-align:start}
+    .inline-alert strong,.inline-alert small{display:block}
+    .inline-alert strong{font-size:14px}.inline-alert small{margin-block-start:2px;color:var(--muted);font-size:12px}
+    .arrow{color:var(--accent)}
+    .tabs{display:flex;gap:4px;margin-block-end:10px;padding:3px;border:1px solid var(--border);border-radius:8px;background:#E9EDF1}
+    .tabs button{flex:1;min-height:44px;padding:7px 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-weight:650}
+    .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(22,32,42,.08)}
+    .detail{margin-block-start:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
+    .detail-head{padding:13px 14px;border-block-end:1px solid var(--border)}
+    .detail-head h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.02em}
+    .detail-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+    .review{margin:0;padding:0 14px}
+    .review div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;padding:10px 0;border-block-end:1px solid var(--border)}
+    .review div:last-child{border:0}
+    .review dt{color:var(--muted);font-size:12px}.review dd{margin:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+    .actions{display:grid;gap:8px;padding:12px 14px;border-block-start:1px solid var(--border);background:#FAFBFC}
+    .button{min-height:44px;padding:9px 13px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:680}
+    .button.primary{border-color:var(--accent);background:var(--accent);color:#fff}
+    .button:disabled{background:var(--disabled);color:#8C96A1}
+    .activity{margin:0;padding:0;list-style:none;border-block-start:1px solid var(--border)}
+    .activity li{padding:11px 8px;border-block-end:1px solid var(--border)}
+    .activity strong,.activity time{display:block}.activity strong{font-size:14px}.activity time{margin-block-start:2px;color:var(--muted);font-size:12px}
+    .report{border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
+    .report header{display:flex;justify-content:space-between;gap:8px;padding:12px 14px;border-block-end:1px solid var(--border)}
+    .report h2{margin:0;font-size:17px}.report p{margin:3px 0 0;color:var(--muted);font-size:12px}
+    .report-building{width:100%;min-height:58px;padding:9px 14px;border:0;border-block-end:1px solid var(--border);background:transparent;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;text-align:start;align-items:center}
+    .report-building strong,.report-building small{display:block}.report-building small{color:var(--muted);font-size:12px}
+    .bottom-nav{position:absolute;z-index:10;inset:auto 0 0;height:calc(64px + var(--safe-bottom));padding:4px 4px var(--safe-bottom);border-block-start:1px solid var(--border);background:var(--surface);display:grid;grid-template-columns:repeat(4,1fr)}
+    .bottom-nav button{min-width:0;min-height:56px;padding:5px 2px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:10px;font-weight:650;display:grid;place-items:center;align-content:center;gap:2px}
+    .bottom-nav button svg{width:19px;height:19px}
+    .bottom-nav button[aria-current="page"]{color:var(--accent);background:var(--selected)}
+    .overlay{position:absolute;z-index:30;inset:0;background:rgba(22,32,42,.42);display:grid;align-items:end}
+    .overlay[hidden]{display:none}
+    .sheet{max-height:78%;overflow:auto;padding:10px 14px calc(18px + var(--safe-bottom));border-radius:10px 10px 0 0;background:var(--surface);box-shadow:0 -10px 30px rgba(22,32,42,.14);overscroll-behavior:contain}
+    .sheet-head{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center;margin-block-end:8px}
+    .sheet h2{margin:0;font-size:19px;line-height:1.3}.sheet p{margin:3px 0 0;color:var(--muted);font-size:12px}
+    .sheet .icon-button{border-color:var(--border);color:var(--ink)}
+    .state-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block-start:12px}
+    .state-grid button{min-height:44px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;font-weight:650}
+    .state-panel{margin-block-start:10px;padding:12px;border:1px solid var(--border);border-radius:8px;background:#FAFBFC}
+    .state-panel h3{margin:0;font-size:15px}.state-panel p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .state-panel.error{border-color:#DDB8B8;background:var(--error-soft)}
+    .state-panel.warning{border-color:#D8C395;background:var(--warning-soft)}
+    .skeleton{height:12px;margin-block:7px;border-radius:4px;background:#DCE2E8}.skeleton.short{width:58%}
+    .toast{position:absolute;z-index:40;inset-inline:10px 62px;inset-block-start:calc(7px + var(--safe-top));min-height:42px;padding:10px 11px;border:1px solid rgba(255,255,255,.18);border-radius:7px;background:#243442;color:#fff;font-size:12px;font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;pointer-events:none;transform:translateY(-6px);transition:opacity 180ms ease,transform 180ms ease}
+    .toast.show{opacity:1;transform:none}
+    @media(max-width:500px){body{background:var(--bg)}.stage{display:block;padding:0}.phone{width:100%;height:100dvh;min-height:560px;border:0;border-radius:0;box-shadow:none}}
+    @media(max-width:340px){.screen{padding-inline:10px}.composer{grid-template-columns:44px minmax(0,1fr) 44px}.review div{grid-template-columns:72px minmax(0,1fr)}.building-card{flex-basis:86vw}.task-row{padding-inline:6px}.state-grid{grid-template-columns:1fr}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+    @media(forced-colors:active){.task-row.selected,.building-card[aria-current="true"],.bottom-nav button[aria-current="page"]{border:2px solid Highlight}.status::before{forced-color-adjust:none}.composer,.detail,.report,.building-card{border-color:CanvasText}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#mainContent">본문으로 바로가기</a>
+  <div class="stage">
+    <div class="phone" id="app">
+      <header class="appbar">
+        <span class="brand">LeaseFlow</span>
+        <button class="profile" id="profileButton" aria-haspopup="dialog" aria-controls="profileSheet" aria-label="내 업무 환경 열기">ML</button>
+      </header>
+
+      <main class="viewport" id="mainContent" tabindex="-1">
+        <section class="screen active" id="home" aria-labelledby="homeTitle">
+          <header class="page-head"><h1 id="homeTitle" tabindex="-1">오늘의 업무</h1><time class="date" datetime="2026-07-19">7월 19일</time></header>
+          <form class="composer" id="requestForm">
+            <button type="button" id="voiceButton" aria-label="음성으로 요청하기"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6"/></svg></button>
+            <label class="sr-only" for="requestInput">업무 요청</label>
+            <input id="requestInput" autocomplete="off" placeholder="자료를 찾거나 준비해 주세요" value="">
+            <button class="send" type="submit" aria-label="요청 보내기"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/></svg></button>
+          </form>
+          <div class="result" id="requestResult" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></div>
+
+          <section class="section" aria-labelledby="nextTitle">
+            <div class="section-head"><h2 id="nextTitle">다음 업무</h2><span class="count">3건</span></div>
+            <div class="task-list" id="homeTasks"></div>
+          </section>
+
+          <section class="section" aria-labelledby="recentBuildingsTitle">
+            <div class="section-head"><h2 id="recentBuildingsTitle">최근 건물</h2><button class="button" id="allBuildingsButton" type="button">전체 건물</button></div>
+            <div class="building-strip" id="buildingStrip" aria-label="최근 건물 목록"></div>
+          </section>
+
+          <section class="section" aria-labelledby="weeklyNoticeTitle">
+            <div class="section-head"><h2 id="weeklyNoticeTitle">주간 보고</h2></div>
+            <button class="inline-alert" type="button" data-open-report="cobalt"><span><strong>코발트자산운용 미팅</strong><small>건물 2곳 · 확인할 내용 1건</small></span><svg class="arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          </section>
+
+          <section class="section" aria-labelledby="recentActivityTitle">
+            <div class="section-head"><h2 id="recentActivityTitle">처리 기록</h2><span class="count">최근 1건</span></div>
+            <button class="inline-alert" type="button" data-screen-link="history"><span><strong>Cobalt Finance Center 안내 자료 승인</strong><small>오늘 14:20 · Mina Lee</small></span><svg class="arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          </section>
+        </section>
+
+        <section class="screen" id="tasks" aria-labelledby="tasksTitle">
+          <header class="page-head"><h1 id="tasksTitle" tabindex="-1">담당 업무</h1><span class="count">진행 3건</span></header>
+          <div class="task-list" id="taskQueue" aria-label="담당 업무 목록"></div>
+          <article class="detail" id="taskPanel" tabindex="-1" aria-label="선택한 업무 상세"></article>
+        </section>
+
+        <section class="screen" id="history" aria-labelledby="historyTitle">
+          <header class="page-head"><h1 id="historyTitle" tabindex="-1">업무 기록</h1><span class="count">이번 주</span></header>
+          <ol class="activity">
+            <li><span class="status success">승인 완료</span><strong>Cobalt Finance Center 안내 자료</strong><time datetime="2026-07-19T14:20">오늘 14:20 · Mina Lee</time></li>
+            <li><span class="status info">정보 게시</span><strong>Pacific Gate Tower 8층 임대조건</strong><time datetime="2026-07-19T11:05">오늘 11:05 · Alex Chen</time></li>
+            <li><span class="status success">보고 기록</span><strong>코발트자산운용 주간 보고</strong><time datetime="2026-07-12">7월 12일 · 건물 2곳</time></li>
+            <li><span class="status warning">보완 요청</span><strong>KFT Center 5층 분할안</strong><time datetime="2026-07-18T16:40">7월 18일 16:40 · 면적 근거 확인</time></li>
+          </ol>
+        </section>
+
+        <section class="screen" id="reports" aria-labelledby="reportsTitle">
+          <header class="page-head"><h1 id="reportsTitle" tabindex="-1">주간 보고</h1><span class="count">임대인 기준</span></header>
+          <article class="report">
+            <header><div><h2>코발트자산운용</h2><p>7월 13일–19일 · 금요일 10:00</p></div><span class="status warning">1건 확인</span></header>
+            <button class="report-building" type="button" data-report-building="cobalt"><span><strong>Cobalt Finance Center</strong><small>문의 3건 · 현장 방문 1건</small></span><span class="status warning">검토</span></button>
+            <button class="report-building" type="button" data-report-building="pacific"><span><strong>Pacific Gate Tower</strong><small>자료 전달 2건 · 조건 협의 1건</small></span><span class="status success">준비</span></button>
+          </article>
+          <article class="detail" id="reportDetail" tabindex="-1"></article>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="주요 메뉴">
+        <button type="button" data-screen="home" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z"/></svg><span>홈</span></button>
+        <button type="button" data-screen="tasks"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 5h12M8 12h12M8 19h12M4 5h.01M4 12h.01M4 19h.01"/></svg><span>담당 업무</span></button>
+        <button type="button" data-screen="history"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg><span>업무 기록</span></button>
+        <button type="button" data-screen="reports"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg><span>주간 보고</span></button>
+      </nav>
+
+      <div class="overlay" id="buildingOverlay" hidden>
+        <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="buildingSheetTitle" id="buildingSheet"></section>
+      </div>
+      <div class="overlay" id="profileOverlay" hidden>
+        <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="profileSheetTitle" id="profileSheet">
+          <header class="sheet-head"><div><h2 id="profileSheetTitle" tabindex="-1">내 업무 환경</h2><p>Mina Lee · 임대 관리자</p></div><button class="icon-button" type="button" data-close="profileOverlay" aria-label="닫기"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+          <div class="state-panel" id="statePanel" aria-live="polite"><h3>현재 정보를 사용하고 있어요</h3><p>게시된 최신 건물 정보와 승인된 파일만 안내 자료에 포함합니다.</p></div>
+          <div class="state-grid" aria-label="업무 상황 확인">
+            <button type="button" data-view-state="loading">불러오는 중</button><button type="button" data-view-state="empty">결과 없음</button>
+            <button type="button" data-view-state="error">연결 실패</button><button type="button" data-view-state="permission">권한 제한</button>
+            <button type="button" data-view-state="success">저장 완료</button><button type="button" data-view-state="stale">이전 정보</button>
+            <button type="button" data-view-state="conflict">변경 충돌</button><button type="button" data-view-state="disabled">작업 불가</button>
+          </div>
+        </section>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+  </div>
+
+  <script>
+    const icons={close:'<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>'};
+    const tasks=[
+      {id:'guide',title:'고객 안내 자료 승인',meta:'Cobalt Finance Center · 오늘 15:00',status:'확인 필요',tone:'warning',step:'받는 사람과 최신 자료 확인',facts:[['건물·공간','Cobalt Finance Center · 12층'],['필요한 내용','임대 면적, 입주 가능일, 지원 주차'],['첨부','Cobalt_Finance_12F_v4.pdf'],['받는 사람','Jordan Kim · Northstar Advisory'],['기한','오늘 15:00'],['근거','7월 임대안내서 12쪽 · 7월 19일 게시']],primary:'안내 자료 승인'},
+      {id:'update',title:'변경된 임대조건 확인',meta:'Pacific Gate Tower · 변경 4건',status:'검토 필요',tone:'info',step:'현재 정보와 제안 정보를 비교',facts:[['건물·공간','Pacific Gate Tower · 8층'],['변경 내용','입주 가능일, 렌트프리, 주차, 평면도'],['현재 정보','입주 가능 8월 1일 · 평면도 v2'],['제안 정보','입주 가능 즉시 · 평면도 v3'],['근거','7월 19일 임대인 제공 자료 4쪽'],['영향','승인 후 팀원이 새 정보를 사용']],primary:'변경 내용 확인'},
+      {id:'report',title:'주간 보고 확인',meta:'코발트자산운용 · 건물 2곳',status:'보고 검토',tone:'warning',step:'건물별 이슈와 수신자 확인',facts:[['임대인','코발트자산운용'],['보고 기간','7월 13일–19일'],['대상 건물','Cobalt Finance Center, Pacific Gate Tower'],['확인할 내용','Cobalt Finance Center 12층 문의 3건'],['받는 사람','운용팀 수신자 그룹'],['발송 전 확인','건물별 최신 정보와 첨부 버전']],primary:'건물별 보고 확인'}
+    ];
+    const buildings=[
+      {id:'cobalt',name:'Cobalt Finance Center',space:'12층',area:'386.4평',available:'즉시',file:'Cobalt_Finance_12F_v4.pdf',version:'v4',updated:'오늘 11:40',source:'7월 임대안내서 12쪽',parking:'18대'},
+      {id:'pacific',name:'Pacific Gate Tower',space:'8층',area:'418.7평',available:'즉시',file:'Pacific_Gate_8F_v3.pdf',version:'v3',updated:'오늘 11:05',source:'7월 19일 임대인 자료 4쪽',parking:'20대'},
+      {id:'kft',name:'KFT Center',space:'5층 A·B 분할',area:'227.5평',available:'9월 1일',file:'KFT_5F_Split_v2.pdf',version:'v2',updated:'어제 16:40',source:'5층 분할 면적 검토표',parking:'12대'},
+      {id:'centerpoint',name:'Centerpoint Gwanghwamun',space:'17층',area:'301.2평',available:'협의',file:'Centerpoint_17F_v5.pdf',version:'v5',updated:'7월 17일',source:'7월 스태킹 플랜 2쪽',parking:'15대'},
+      {id:'city',name:'City Square Seoul',space:'9층',area:'254.8평',available:'10월 1일',file:'City_Square_9F_v2.pdf',version:'v2',updated:'7월 16일',source:'임대조건표 9층 행',parking:'10대'}
+    ];
+    const state={screen:'home',task:'guide',building:'cobalt',report:'cobalt',scroll:{},lastTrigger:null};
+    const viewport=document.querySelector('.viewport');
+    const screens=[...document.querySelectorAll('.screen')];
+    const nav=[...document.querySelectorAll('.bottom-nav [data-screen]')];
+    const toast=document.getElementById('toast');
+
+    function statusBadge(item){return `<span class="status ${item.tone}">${item.status}</span>`}
+    function renderTasks(){
+      const rows=tasks.map(task=>`<button type="button" class="task-row ${state.task===task.id?'selected':''}" data-task="${task.id}" aria-pressed="${state.task===task.id}"><span><strong>${task.title}</strong><small>${task.meta}</small></span><span class="state">${statusBadge(task)}</span></button>`).join('');
+      document.getElementById('homeTasks').innerHTML=rows;
+      document.getElementById('taskQueue').innerHTML=rows;
+      document.querySelectorAll('[data-task]').forEach(button=>button.addEventListener('click',()=>selectTask(button.dataset.task,true)));
+      renderTaskDetail();
+    }
+    function renderTaskDetail(){
+      const task=tasks.find(item=>item.id===state.task)||tasks[0];
+      const panel=document.getElementById('taskPanel');
+      panel.innerHTML=`<header class="detail-head"><h2>${task.title}</h2><p>${task.step}</p></header><dl class="review">${task.facts.map(([term,value])=>`<div><dt>${term}</dt><dd>${value}</dd></div>`).join('')}</dl><div class="actions"><button type="button" class="button primary" id="taskPrimary">${task.primary}</button><button type="button" class="button" id="taskSecondary">내용 수정</button></div>`;
+      document.getElementById('taskPrimary').addEventListener('click',()=>notify(`${task.primary} 단계를 열었어요.`));
+      document.getElementById('taskSecondary').addEventListener('click',()=>notify('수정할 항목을 선택할 수 있어요.'));
+    }
+    function selectTask(id,open){state.task=id;renderTasks();if(open)navigate('tasks',true)}
+    function renderBuildings(){
+      document.getElementById('buildingStrip').innerHTML=buildings.map(building=>`<button type="button" class="building-card" data-building="${building.id}" aria-current="${state.building===building.id}"><strong>${building.name}</strong><small>${building.space} · ${building.version} · ${building.updated} 반영</small><span class="building-facts"><span>임대 면적<b>${building.area}</b></span><span>입주 가능<b>${building.available}</b></span></span></button>`).join('');
+      document.querySelectorAll('[data-building]').forEach(button=>button.addEventListener('click',()=>openBuilding(button.dataset.building,button)));
+    }
+    function openBuilding(id,trigger){
+      state.building=id;renderBuildings();state.lastTrigger=document.querySelector(`[data-building="${id}"]`);const building=buildings.find(item=>item.id===id);const sheet=document.getElementById('buildingSheet');
+      sheet.innerHTML=`<header class="sheet-head"><div><h2 id="buildingSheetTitle" tabindex="-1">${building.name}</h2><p>${building.space} · 게시된 최신 정보 ${building.version}</p></div><button class="icon-button" type="button" data-close="buildingOverlay" aria-label="닫기">${icons.close}</button></header><dl class="review"><div><dt>임대 면적</dt><dd>${building.area}</dd></div><div><dt>입주 가능</dt><dd>${building.available}</dd></div><div><dt>지원 주차</dt><dd>${building.parking}</dd></div><div><dt>평면도</dt><dd>${building.file}</dd></div><div><dt>최근 반영</dt><dd>${building.updated}</dd></div><div><dt>근거</dt><dd>${building.source}</dd></div></dl><div class="actions"><button type="button" class="button primary" id="useBuilding">이 정보로 자료 준비</button><button type="button" class="button" data-close="buildingOverlay">닫기</button></div>`;
+      openOverlay('buildingOverlay',sheet.querySelector('h2'));
+      sheet.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>closeOverlay(button.dataset.close)));
+      document.getElementById('useBuilding').addEventListener('click',()=>{closeOverlay('buildingOverlay');document.getElementById('requestInput').value=`${building.name} ${building.space} 최신 임대 정보를 안내 자료로 준비해줘`;document.getElementById('requestInput').focus()});
+    }
+    function renderReport(){
+      const building=buildings.find(item=>item.id===state.report)||buildings[0];
+      document.getElementById('reportDetail').innerHTML=`<header class="detail-head"><h2>${building.name}</h2><p>건물별 보고 내용과 최신 근거 확인</p></header><dl class="review"><div><dt>이번 주 이슈</dt><dd>${building.id==='cobalt'?'신규 문의 3건 · 현장 방문 1건':'자료 전달 2건 · 조건 협의 1건'}</dd></div><div><dt>기준 정보</dt><dd>${building.space} · ${building.area} · ${building.version}</dd></div><div><dt>첨부</dt><dd>${building.file}</dd></div><div><dt>최근 반영</dt><dd>${building.updated}</dd></div><div><dt>받는 사람</dt><dd>코발트자산운용 운용팀 수신자 그룹</dd></div></dl><div class="actions"><button type="button" class="button primary" id="reportPrimary">보고 내용 승인</button><button type="button" class="button" id="reportEdit">내용 수정</button></div>`;
+      document.getElementById('reportPrimary').addEventListener('click',()=>notify(`${building.name} 보고 내용을 승인했어요.`));
+      document.getElementById('reportEdit').addEventListener('click',()=>notify('수정할 보고 항목을 선택할 수 있어요.'));
+    }
+    function navigate(id,push=true){
+      if(!document.getElementById(id))id='home';state.scroll[state.screen]=viewport.scrollTop;state.screen=id;
+      screens.forEach(screen=>screen.classList.toggle('active',screen.id===id));nav.forEach(button=>{if(button.dataset.screen===id)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current')});
+      if(push&&location.hash!==`#${id}`)history.pushState({screen:id,task:state.task,building:state.building,report:state.report},'',`#${id}`);
+      requestAnimationFrame(()=>{viewport.scrollTop=state.scroll[id]||0;document.getElementById(`${id}Title`)?.focus({preventScroll:true})});
+    }
+    function notify(message){toast.textContent=message;toast.classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>toast.classList.remove('show'),2200)}
+    function openOverlay(id,focusTarget){const overlay=document.getElementById(id);overlay.hidden=false;document.body.style.overflow='hidden';requestAnimationFrame(()=>focusTarget?.focus())}
+    function closeOverlay(id){const overlay=document.getElementById(id);overlay.hidden=true;document.body.style.overflow='';state.lastTrigger?.focus();state.lastTrigger=null}
+    function trapDialog(event){const overlay=event.currentTarget;if(event.key==='Escape'){closeOverlay(overlay.id);return}if(event.key!=='Tab')return;const focusable=[...overlay.querySelectorAll('button:not(:disabled),input:not(:disabled),[tabindex="0"]')];if(!focusable.length)return;const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}
+
+    document.getElementById('requestForm').addEventListener('submit',event=>{event.preventDefault();const input=document.getElementById('requestInput');const result=document.getElementById('requestResult');const query=input.value.trim();if(!query){result.hidden=false;result.innerHTML='<strong>요청 내용을 입력해 주세요</strong><span>건물명과 필요한 자료를 함께 적으면 빠르게 찾을 수 있어요.</span>';input.focus();return}result.hidden=false;result.innerHTML=`<strong>${query}</strong><span>게시된 최신 정보와 승인된 파일을 기준으로 관련 업무를 찾았어요.</span>`;result.focus?.();result.scrollIntoView({block:'nearest'});notify('관련 업무를 찾았어요.')});
+    document.getElementById('voiceButton').addEventListener('click',()=>{const input=document.getElementById('requestInput');input.value='Cobalt Finance Center 12층 최신 평면도 찾아줘';input.focus();notify('음성 요청을 입력했어요.')});
+    document.getElementById('allBuildingsButton').addEventListener('click',()=>{const strip=document.getElementById('buildingStrip');strip.scrollTo({left:strip.scrollWidth,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});notify('등록된 건물 5곳을 모두 볼 수 있어요.')});
+    document.getElementById('profileButton').addEventListener('click',event=>{state.lastTrigger=event.currentTarget;openOverlay('profileOverlay',document.getElementById('profileSheetTitle'))});
+    document.querySelectorAll('[data-close="profileOverlay"]').forEach(button=>button.addEventListener('click',()=>closeOverlay('profileOverlay')));
+    document.querySelectorAll('.overlay').forEach(overlay=>{overlay.addEventListener('keydown',trapDialog);overlay.addEventListener('click',event=>{if(event.target===overlay)closeOverlay(overlay.id)})});
+    document.querySelectorAll('[data-view-state]').forEach(button=>button.addEventListener('click',()=>{
+      const states={loading:['정보를 불러오고 있어요','잠시만 기다려 주세요.','','기다리는 중',true],empty:['조건에 맞는 정보가 없어요','검색어나 건물 범위를 바꿔 다시 찾아보세요.','','검색 범위 바꾸기',false],error:['정보를 불러오지 못했어요','입력한 내용은 유지했어요. 잠시 후 다시 시도해 주세요.','error','다시 시도',false],permission:['이 업무를 변경할 권한이 없어요','현재 정보는 볼 수 있어요. 승인은 선임 검토자에게 요청해 주세요.','warning','승인 요청',true],success:['저장했어요','변경 내용과 처리 시각을 업무 기록에 남겼어요.','','업무 기록 보기',false],stale:['새 정보가 게시됐어요','이전 파일은 안내 자료에 넣을 수 없어요. 최신 정보로 다시 준비해 주세요.','warning','최신 정보로 다시 준비',false],conflict:['다른 팀원이 먼저 변경했어요','최신 정보와 내가 입력한 내용을 다시 비교해 주세요.','warning','변경 내용 다시 비교',false],disabled:['지금은 이 작업을 할 수 없어요','받는 사람과 최신 첨부가 확인되면 다시 사용할 수 있어요.','warning','확인하고 발송',true]};
+      const [title,copy,tone,action,disabled]=states[button.dataset.viewState];const panel=document.getElementById('statePanel');panel.className=`state-panel ${tone}`;panel.setAttribute('aria-busy',button.dataset.viewState==='loading'?'true':'false');panel.innerHTML=button.dataset.viewState==='loading'?`<h3>${title}</h3><div class="skeleton"></div><div class="skeleton short"></div><button type="button" class="button" disabled>${action}</button>`:`<h3>${title}</h3><p>${copy}</p><button type="button" class="button" ${disabled?'disabled':''}>${action}</button>`;panel.querySelector('button:not(:disabled)')?.addEventListener('click',()=>notify(`${action} 화면을 열었어요.`));
+    }));
+    nav.forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.screen,true)));
+    document.querySelectorAll('[data-screen-link]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.screenLink,true)));
+    document.querySelectorAll('[data-open-report]').forEach(button=>button.addEventListener('click',()=>{state.report=button.dataset.openReport;renderReport();navigate('reports',true)}));
+    document.querySelectorAll('[data-report-building]').forEach(button=>button.addEventListener('click',()=>{state.report=button.dataset.reportBuilding;renderReport();document.getElementById('reportDetail').focus()}));
+    addEventListener('popstate',event=>{const saved=event.state||{};if(saved.task)state.task=saved.task;if(saved.building)state.building=saved.building;if(saved.report)state.report=saved.report;renderTasks();renderBuildings();renderReport();navigate(saved.screen||location.hash.slice(1)||'home',false)});
+    renderTasks();renderBuildings();renderReport();
+    history.replaceState({screen:location.hash.slice(1)||'home',task:state.task,building:state.building,report:state.report},'',location.hash||'#home');
+    navigate(location.hash.slice(1)||'home',false);
+  </script>
+</body>
+</html>

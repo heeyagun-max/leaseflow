@@ -3,6 +3,7 @@ import {
   DemoStateCorruptError,
   RevisionConflictError,
   WeeklyReportStaleError,
+  WorkflowAccessError,
 } from "./demo-store.server";
 
 export interface WorkflowErrorResponse {
@@ -28,6 +29,9 @@ export function classifyWorkflowError(error: unknown): WorkflowErrorResponse {
   }
   if (error instanceof DemoStateCorruptError) {
     return { status: 500, body: { code: "STATE_CORRUPT", error: "Demo state is unavailable." } };
+  }
+  if (error instanceof WorkflowAccessError) {
+    return { status: 403, body: { code: "FORBIDDEN", error: "현재 역할로 이 작업을 수행할 수 없습니다." } };
   }
   if (message.includes("Idempotency key is already assigned to another package")
     || message.includes("Idempotency key is already assigned to another weekly report")) {

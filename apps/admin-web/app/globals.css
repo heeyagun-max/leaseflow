@@ -1,33 +1,33 @@
 :root {
   color-scheme: light;
 
-  --lf-canvas-deep: #ece7dc;
-  --lf-canvas: #f7f4ed;
-  --lf-ink: #132b3a;
-  --lf-ink-soft: #315f88;
-  --lf-surface-0: #f0efeb;
+  --lf-canvas-deep: #e8ecf1;
+  --lf-canvas: #f3f5f7;
+  --lf-ink: #17212b;
+  --lf-ink-soft: #506579;
+  --lf-surface-0: #eef1f4;
   --lf-surface-1: #ffffff;
-  --lf-surface-2: #f5f4f1;
-  --lf-surface-3: #eceae5;
-  --lf-surface-disabled: #f1f0ed;
-  --lf-text-1: #23211f;
-  --lf-text-2: #625e57;
-  --lf-text-3: #827d75;
-  --lf-text-disabled: #8c8780;
-  --lf-border-subtle: rgba(35, 33, 31, 0.07);
-  --lf-border: rgba(35, 33, 31, 0.11);
-  --lf-border-strong: rgba(35, 33, 31, 0.2);
+  --lf-surface-2: #f7f8fa;
+  --lf-surface-3: #edf0f3;
+  --lf-surface-disabled: #edf0f3;
+  --lf-text-1: #17212b;
+  --lf-text-2: #687483;
+  --lf-text-3: #778391;
+  --lf-text-disabled: #7d8793;
+  --lf-border-subtle: #e5e9ee;
+  --lf-border: #d8dee6;
+  --lf-border-strong: #a9b3bf;
   --lf-rim-light: rgba(255, 255, 255, 0.92);
-  --lf-emerald-100: #e8f1fb;
-  --lf-emerald-200: #cfe2f7;
-  --lf-emerald-300: #76a9df;
-  --lf-emerald-400: #3f7fbd;
-  --lf-emerald-500: #2563a6;
-  --lf-emerald-700: #194b7d;
-  --lf-accent-wash: rgba(37, 99, 166, 0.08);
-  --lf-accent-border: rgba(37, 99, 166, 0.3);
-  --lf-success: #287a4b;
-  --lf-warning: #9a5b14;
+  --lf-emerald-100: #e8eef7;
+  --lf-emerald-200: #d3deed;
+  --lf-emerald-300: #8ea7c8;
+  --lf-emerald-400: #5579aa;
+  --lf-emerald-500: #355f9c;
+  --lf-emerald-700: #284a7d;
+  --lf-accent-wash: rgba(53, 95, 156, 0.08);
+  --lf-accent-border: rgba(53, 95, 156, 0.3);
+  --lf-success: #2f6b55;
+  --lf-warning: #946a26;
   --lf-error: #b33a3a;
   --lf-info: #2d69a8;
   --lf-warning-wash: rgba(154, 91, 20, 0.08);
@@ -1248,13 +1248,15 @@ select {
 }
 
 .lf-admin-nav__brand strong { font-size: 1.2rem; }
-.lf-admin-nav__brand span { color: #b8c6d0; font-size: 0.8125rem; }
 
 .lf-admin-nav__links {
   display: grid;
-  gap: 0.25rem;
+  gap: 1.25rem;
   min-inline-size: 0;
 }
+
+.lf-admin-nav__group { display: grid; gap: 0.25rem; }
+.lf-admin-nav__group--secondary { padding-block-start: 1rem; border-block-start: 1px solid rgba(255, 255, 255, 0.12); }
 
 .lf-admin-nav__links a {
   position: relative;
@@ -1290,17 +1292,6 @@ select {
   min-inline-size: 0;
   padding: 1.5rem clamp(1rem, 3vw, 2rem) 2rem;
 }
-
-.lf-admin-breadcrumbs {
-  display: flex;
-  min-block-size: 2.75rem;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  color: #625e57;
-  font-size: 0.8125rem;
-}
-.lf-admin-breadcrumbs a { color: #1f5fae; }
 
 .lf-admin-main {
   inline-size: min(100%, 87.5rem);
@@ -1581,6 +1572,8 @@ select {
   .lf-admin-registry-mobile { display: block; }
   .lf-admin-registry-mobile li + li { border-block-start: 1px solid #e3ded4; }
   .lf-admin-registry-mobile a { display: block; min-block-size: 2.75rem; padding: 0.875rem; text-decoration: none; }
+  .lf-admin-history-mobile li { padding: 0.875rem; }
+  .lf-admin-history-mobile h3 { margin: 0; font-size: 1rem; }
   .lf-admin-registry-mobile dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; margin: 0.5rem 0 0; }
   .lf-admin-registry-mobile dt { color: #625e57; font-size: 0.75rem; font-weight: 600; }
   .lf-admin-registry-mobile dd { margin: 0.125rem 0 0; overflow-wrap: anywhere; }
@@ -1624,4 +1617,329 @@ select {
   .lf-admin-feedback,
   .lf-admin-decision,
   .lf-admin-comparison > li { border: 2px solid CanvasText; }
+}
+
+.lf-visually-hidden { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.lf-service-header { display: flex; max-inline-size: none; gap: 1rem; align-items: center; justify-content: space-between; margin-block: 1.5rem 2rem; }
+.lf-service-header > div { min-inline-size: 0; }
+.lf-service-eyebrow { margin: 0 0 0.375rem; color: var(--lf-emerald-500); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.lf-service-header h1 { margin: 0; color: var(--lf-ink); font-size: var(--lf-type-h1); letter-spacing: -0.03em; line-height: 1.2; }
+.lf-service-result { display: grid; gap: 1.25rem; margin-block-start: 1.25rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--lf-border); border-radius: 1rem; background: #fff; box-shadow: var(--lf-shadow-work); }
+.lf-service-result__confirm span, .lf-service-card-grid span, .lf-service-file span { color: var(--lf-emerald-700); font-size: 0.75rem; font-weight: 800; }
+.lf-service-result__confirm h2 { margin: 0.375rem 0; font-size: 1.25rem; }
+.lf-service-result__confirm p { margin: 0; color: var(--lf-text-2); }
+.lf-service-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
+.lf-service-facts > div { padding: 1rem; border-radius: 0.75rem; background: var(--lf-surface-2); }
+.lf-service-facts dt { color: var(--lf-text-2); font-size: 0.8125rem; }
+.lf-service-facts dd { margin: 0.25rem 0 0; color: var(--lf-ink); font-size: 1.25rem; font-weight: 750; }
+.lf-service-file { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding-block: 1rem; border-block: 1px solid var(--lf-border); }
+.lf-service-file strong, .lf-service-file span { display: block; }
+.lf-service-next { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.lf-service-next h3 { inline-size: 100%; margin: 0; font-size: 0.875rem; }
+.lf-service-next > a:not(.lf-admin-button) { color: var(--lf-emerald-700); font-weight: 650; }
+.lf-building-index-header { display: grid; grid-template-columns: minmax(12rem, .7fr) minmax(22rem, 1.3fr); gap: 1rem; align-items: center; margin-block: 1.25rem 1.5rem; padding: 1rem; border: 1px solid var(--lf-border); border-radius: 0.5rem; background: #fff; }
+.lf-building-index-header h1 { margin: 0; color: var(--lf-ink); font-size: clamp(1.5rem, 2.2vw, 1.75rem); letter-spacing: -0.03em; line-height: 1.2; }
+.lf-building-search { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.625rem; align-items: center; min-block-size: 2.75rem; padding-inline: 0.75rem; border: 1px solid var(--lf-border-strong); border-radius: 0.375rem; background: var(--lf-surface-2); color: var(--lf-text-2); }
+.lf-building-search:focus-within { border-color: var(--lf-emerald-500); box-shadow: 0 0 0 2px var(--lf-accent-wash); }
+.lf-building-search svg { inline-size: 1.125rem; block-size: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.lf-building-search input { min-inline-size: 0; min-block-size: 2.625rem; padding: 0; border: 0; outline: 0; background: transparent; color: var(--lf-text-1); }
+.lf-building-search input::placeholder { color: var(--lf-text-3); opacity: 1; }
+.lf-building-index-list { display: grid; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.lf-building-card { display: grid; grid-template-columns: minmax(14rem, .9fr) minmax(28rem, 1.5fr) auto; gap: 1.25rem; align-items: center; padding: 1.25rem; border: 1px solid var(--lf-border); border-radius: 0.875rem; background: #fff; }
+.lf-building-card h3 { margin: 0.5rem 0 0.125rem; font-size: 1.2rem; }
+.lf-building-card p { margin: 0; color: var(--lf-text-2); }
+.lf-building-card__identity > div { display: flex; gap: 0.625rem; align-items: center; }
+.lf-building-card__identity > div > span:last-child { color: var(--lf-text-2); font-size: 0.75rem; font-weight: 700; }
+.lf-building-summary-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.625rem; margin: 0; }
+.lf-building-summary-facts > div { min-inline-size: 0; padding: 0.875rem; border-radius: 0.5rem; background: var(--lf-surface-2); }
+.lf-building-summary-facts dt { color: var(--lf-text-2); font-size: 0.75rem; font-weight: 650; }
+.lf-building-summary-facts dd { margin: 0.25rem 0 0; color: var(--lf-text-1); font-weight: 750; overflow-wrap: anywhere; }
+.lf-service-status { display: inline-flex; inline-size: fit-content; min-block-size: 1.75rem; align-items: center; padding: 0.25rem 0.625rem; border-radius: 999px; background: #e4f2ef; color: #176c67; font-size: 0.75rem; font-weight: 750; }
+.lf-service-state { margin-block: 1rem; padding: 1.5rem; border: 1px dashed var(--lf-border-strong); border-radius: 0.75rem; background: var(--lf-surface-2); }
+.lf-service-state h2, .lf-service-state h3 { margin: 0; font-size: 1rem; }
+.lf-service-state p { margin: 0.5rem 0 1rem; color: var(--lf-text-2); }
+.lf-building-hero { display: grid; grid-template-columns: minmax(12rem, 0.75fr) minmax(22rem, 1.25fr); gap: 2rem; align-items: center; padding: 1.75rem; border-radius: 1rem; background: #173e5d; color: #fff; }
+.lf-building-hero h2 { margin: 0.5rem 0 0; color: #fff; }
+.lf-building-hero p { margin: 0.25rem 0 0; color: #cfdae1; }
+.lf-building-hero .lf-service-facts > div { background: rgba(255,255,255,.1); }
+.lf-building-hero .lf-service-facts dt { color: #cfdae1; }
+.lf-building-hero .lf-service-facts dd { color: #fff; }
+.lf-service-split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(17rem, .5fr); gap: 1.5rem; margin-block-start: 2rem; }
+.lf-service-split h2 { margin-block-start: 0; }
+.lf-service-list { margin: 0; padding: 0; border-block-start: 1px solid var(--lf-border); list-style: none; }
+.lf-service-list li { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1rem 0; border-block-end: 1px solid var(--lf-border); }
+.lf-service-list strong, .lf-service-list span { display: block; }
+.lf-service-list span { color: var(--lf-text-2); font-size: 0.8125rem; }
+.lf-service-list a { color: var(--lf-emerald-700); font-weight: 700; }
+.lf-service-action { align-self: start; padding: 1.5rem; border-radius: 0.875rem; background: #e9f1f7; }
+.lf-service-action h2 { font-size: 1.125rem; }
+.lf-service-action p { color: var(--lf-text-2); }
+.lf-service-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.lf-service-progress li { display: grid; gap: 0.375rem; justify-items: center; padding: 0.75rem 0.375rem; color: var(--lf-text-3); font-size: 0.875rem; text-align: center; }
+.lf-service-progress li span { display: grid; inline-size: 1.75rem; block-size: 1.75rem; place-items: center; border: 1px solid var(--lf-border-strong); border-radius: 999px; background: #fff; }
+.lf-service-progress li.is-current { color: var(--lf-emerald-700); font-weight: 750; }
+.lf-service-progress li.is-current span { border-color: var(--lf-emerald-500); background: var(--lf-emerald-500); color: #fff; }
+.lf-service-work-card { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--lf-border); border-radius: 1rem; background: #fff; }
+.lf-service-title-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; }
+.lf-service-title-row h2 { min-inline-size: 0; margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.lf-service-title-row .lf-service-status { justify-self: end; white-space: nowrap; }
+.lf-service-work-card > p { margin: 0.75rem 0 1rem; }
+.lf-service-request { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0; margin: 1.25rem 0; border-block-start: 1px solid var(--lf-border); }
+.lf-service-request > div { padding: 0.875rem 0; border-block-end: 1px solid var(--lf-border); }
+.lf-service-request dt { color: var(--lf-text-2); font-size: 0.75rem; font-weight: 700; }
+.lf-service-request dd { margin: 0.25rem 0 0; }
+.lf-service-package { display: grid; gap: 1rem; margin-block: 1.25rem; }
+.lf-service-package > div { padding: 1rem; border-radius: 0.625rem; background: var(--lf-surface-2); }
+.lf-service-package h3 { margin: 0; font-size: 0.875rem; }
+.lf-service-package p { white-space: pre-wrap; }
+.lf-landlord-group { overflow: hidden; border: 1px solid var(--lf-border); border-radius: 1rem; background: #fff; }
+.lf-landlord-group > header { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1.5rem; background: #eef6f5; }
+.lf-landlord-group h2 { margin: 0; font-size: 1.3rem; }
+.lf-landlord-group header p { margin: 0.25rem 0 0; color: var(--lf-text-2); }
+.lf-weekly-buildings { margin: 0; padding: 0; list-style: none; }
+.lf-weekly-buildings li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1.25rem; align-items: center; padding: 1.25rem 1.5rem; border-block-start: 1px solid var(--lf-border); }
+.lf-weekly-buildings h3 { margin: 0; }
+.lf-weekly-buildings p { margin: 0.25rem 0 0; color: var(--lf-text-2); }
+.lf-weekly-automation-list { display: grid; gap: 1rem; }
+.lf-weekly-group-actions { display: flex; gap: 0.75rem; align-items: center; }
+.lf-weekly-group-actions a { color: #234f87; font-size: 0.8125rem; font-weight: 750; text-decoration: none; }
+.lf-weekly-group-actions a:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+.lf-weekly-automation-summary { display: grid; grid-template-columns: minmax(18rem, 0.8fr) minmax(24rem, 1.2fr); gap: 1rem 1.5rem; padding: 1rem 1.5rem; border-block-start: 1px solid var(--lf-border); background: #fff; }
+.lf-weekly-automation-summary dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; margin: 0; }
+.lf-weekly-automation-summary dt { color: var(--lf-text-2); font-size: 0.75rem; font-weight: 700; }
+.lf-weekly-automation-summary dd { margin: 0.2rem 0 0; font-weight: 700; }
+.lf-weekly-automation-summary ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.lf-weekly-automation-summary li { padding: 0.625rem 0.75rem; border-radius: 0.375rem; background: var(--lf-surface-2); color: var(--lf-text-2); font-size: 0.8125rem; }
+.lf-weekly-automation-summary > p { grid-column: 1 / -1; margin: 0; padding-block-start: 0.75rem; border-block-start: 1px solid var(--lf-border); color: var(--lf-text-2); font-size: 0.8125rem; }
+.lf-weekly-automation-summary > p span { margin-inline-end: 0.75rem; color: var(--lf-text-1); font-weight: 750; }
+
+@media (max-width: 60rem) {
+  .lf-building-card { grid-template-columns: minmax(0, 1fr); }
+  .lf-building-card > .lf-admin-button { justify-self: start; }
+  .lf-service-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 47.99rem) {
+  .lf-building-index-header, .lf-building-hero { grid-template-columns: minmax(0, 1fr); }
+  .lf-service-facts { grid-template-columns: minmax(0, 1fr); }
+  .lf-building-summary-facts { grid-template-columns: minmax(0, 1fr); }
+  .lf-service-file, .lf-landlord-group > header { align-items: stretch; flex-direction: column; }
+  .lf-service-header { align-items: stretch; flex-direction: column; }
+  .lf-service-header > .lf-admin-button { inline-size: 100%; }
+  .lf-weekly-group-actions { justify-content: space-between; }
+  .lf-weekly-automation-summary { grid-template-columns: minmax(0, 1fr); padding-inline: 1rem; }
+  .lf-weekly-automation-summary ul, .lf-weekly-automation-summary dl { grid-template-columns: minmax(0, 1fr); }
+  .lf-weekly-buildings li { grid-template-columns: minmax(0, 1fr); }
+  .lf-service-progress { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .lf-service-progress li { grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-items: start; padding: 0.375rem; text-align: start; }
+  .lf-service-request { grid-template-columns: minmax(0, 1fr); }
+}
+
+.lf-admin-shell { background: #f3f5f7; }
+.lf-admin-nav,
+.lf-admin-appbar,
+.lf-admin-drawer[open] { background: #16202a; color: #fff; }
+.lf-admin-nav__links a { color: #c5ced7; }
+.lf-admin-nav__links a:hover,
+.lf-admin-nav__links a[aria-current="page"] { color: #fff; }
+.lf-admin-nav__links a[aria-current="page"]::before { background: #9cb6d8; }
+.lf-admin-body { padding-block-start: 0; }
+.lf-admin-main { inline-size: min(100%, 87.5rem); }
+.lf-admin-nav__links a,
+.lf-admin-button { transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out; }
+.lf-admin-nav__links a:active,
+.lf-admin-button:active { transform: none; }
+
+.lf-admin-contextbar {
+  display: flex;
+  min-block-size: 3.5rem;
+  align-items: center;
+  border-block-end: 1px solid #d8dee6;
+  color: #687483;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.lf-admin-demo-disclosure {
+  inline-size: min(100%, 87.5rem);
+  margin: 2.5rem auto 0;
+  border-block-start: 1px solid #d8dee6;
+}
+.lf-admin-demo-disclosure summary {
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  align-items: center;
+  color: #687483;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.lf-admin-demo-tools {
+  grid-template-columns: minmax(16rem, 1fr) minmax(15rem, 20rem) auto;
+  inline-size: 100%;
+  margin: 0;
+  padding: 1rem 0 0;
+  border: 0;
+}
+
+.lf-service-header { margin-block: 1.25rem 1.5rem; }
+.lf-service-eyebrow { display: none; }
+.lf-service-header h1 { color: #17212b; font-size: clamp(1.5rem, 2.2vw, 1.75rem); }
+.lf-service-status { background: #e9f2ee; color: #2f6b55; }
+.lf-service-result,
+.lf-service-work-card,
+.lf-building-card,
+.lf-landlord-group { border-color: #d8dee6; border-radius: 0.5rem; box-shadow: none; }
+
+.lf-home-command {
+  margin-block-start: 1.25rem !important;
+  padding: 0;
+  border: 1px solid #c5ced7;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.lf-home-command:focus-within { border-color: #355f9c; box-shadow: 0 0 0 2px rgba(53, 95, 156, 0.12); }
+.lf-home-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; inline-size: 100%; padding: 0.5rem; }
+.lf-home-composer textarea {
+  display: block;
+  inline-size: 100%;
+  min-block-size: 3.5rem;
+  max-block-size: 8rem;
+  resize: vertical;
+  padding: 0.75rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #17212b;
+  line-height: 1.45;
+}
+.lf-home-composer textarea::placeholder { color: #778391; opacity: 1; }
+.lf-home-composer > div { display: flex; gap: 0.5rem; align-items: flex-end; }
+.lf-home-composer button {
+  display: grid;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #c5ced7;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #506579;
+  cursor: pointer;
+}
+.lf-home-composer button:hover { background: #f3f5f7; }
+.lf-home-composer button.is-send { border-color: #355f9c; background: #355f9c; color: #fff; }
+.lf-home-composer button:disabled { border-color: #d8dee6; background: #edf0f3; color: #7d8793; cursor: not-allowed; }
+.lf-home-composer svg { inline-size: 1.25rem; block-size: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.lf-service-result {
+  display: grid;
+  gap: 1rem;
+  margin-block-start: 0.75rem !important;
+  padding: 1rem;
+  border-inline-start: 2px solid #355f9c;
+  background: #fff;
+}
+.lf-service-result__confirm span,
+.lf-service-file span { color: #355f9c; font-size: 0.75rem; font-weight: 750; }
+.lf-service-result__confirm h2 { margin: 0.25rem 0; font-size: 1.125rem; }
+.lf-service-result__confirm p { margin: 0; color: #687483; }
+
+.lf-home-overview {
+  display: grid;
+  grid-template-areas: "work updates weekly";
+  grid-template-columns: minmax(0, 1.08fr) repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block-start: 1rem !important;
+}
+.lf-home-summary {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  border: 1px solid #d8dee6;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.lf-home-summary--work { grid-area: work; border-inline-start: 2px solid #355f9c; }
+.lf-home-summary--updates { grid-area: updates; }
+.lf-home-summary--weekly { grid-area: weekly; }
+.lf-home-summary > header,
+.lf-home-summary > footer {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+}
+.lf-home-summary > header { border-block-end: 1px solid #e5e9ee; color: #687483; font-size: 0.75rem; font-weight: 700; }
+.lf-home-summary > header strong { color: #355f9c; font-variant-numeric: tabular-nums; }
+.lf-home-summary__body { min-inline-size: 0; padding: 1rem; }
+.lf-home-summary__title { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; align-items: start; }
+.lf-home-summary__title h2 { min-inline-size: 0; margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+.lf-home-summary__title .lf-service-status { justify-self: end; white-space: nowrap; }
+.lf-home-summary__body > p { margin: 0.375rem 0 0; color: #687483; overflow-wrap: anywhere; }
+.lf-home-summary__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1.25rem 0 0; border-block-start: 1px solid #d8dee6; }
+.lf-home-summary__facts--compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lf-home-summary__facts > div { min-inline-size: 0; padding-block: 0.875rem; }
+.lf-home-summary__facts > div + div { padding-inline-start: 0.875rem; border-inline-start: 1px solid #e5e9ee; }
+.lf-home-summary__facts dt,
+.lf-home-update-preview span { color: #687483; font-size: 0.75rem; font-weight: 650; }
+.lf-home-summary__facts dd { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+.lf-home-update-preview { margin: 1rem 0 0; padding: 0; border-block-start: 1px solid #d8dee6; list-style: none; }
+.lf-home-update-preview li { display: flex; min-inline-size: 0; justify-content: space-between; gap: 1rem; padding-block: 0.75rem; border-block-end: 1px solid #e5e9ee; }
+.lf-home-update-preview strong { min-inline-size: 0; font-size: 0.8125rem; font-weight: 650; overflow-wrap: anywhere; text-align: end; }
+.lf-home-summary > footer { border-block-start: 1px solid #e5e9ee; }
+.lf-home-summary > footer a { display: flex; inline-size: 100%; min-inline-size: 0; align-items: center; justify-content: space-between; color: #234f87; font-weight: 700; text-decoration: none; }
+.lf-home-summary > footer a:hover { color: #17375f; text-decoration: underline; text-underline-offset: 0.2em; }
+
+.lf-home-section-heading { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.lf-home-section-heading > div > span,
+.lf-home-section-heading > span { display: block; margin-block-end: 0.25rem; color: #687483; font-size: 0.75rem; font-weight: 650; }
+.lf-admin-main .lf-home-section-heading h2 { margin: 0; font-size: 1.125rem; }
+.lf-home-detail-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1rem 0 0; border-block-start: 1px solid #d8dee6; }
+.lf-home-detail-list > div { min-inline-size: 0; padding: 0.875rem 0; border-block-end: 1px solid #e5e9ee; }
+.lf-home-detail-list > div:nth-child(odd) { padding-inline-end: 1rem; }
+.lf-home-detail-list dt { color: #687483; font-size: 0.75rem; font-weight: 650; }
+.lf-home-detail-list dd { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+
+.lf-building-hero { border: 1px solid #d8dee6; border-inline-start: 2px solid #355f9c; border-radius: 0.5rem; background: #fff; color: #17212b; }
+.lf-building-hero h2 { color: #17212b; }
+.lf-building-hero p { color: #687483; }
+.lf-building-hero .lf-service-facts > div { background: #f3f5f7; }
+.lf-building-hero .lf-service-facts dt { color: #687483; }
+.lf-building-hero .lf-service-facts dd { color: #17212b; }
+.lf-building-provenance { padding: 1rem; border: 1px solid #d8dee6; border-radius: 0.5rem; background: #fff; }
+.lf-building-provenance__note { margin: 0.75rem 0 0; color: #687483; }
+.lf-service-action { border: 1px solid #d8dee6; border-radius: 0.5rem; background: #f4f7fb; }
+.lf-landlord-group > header { background: #f4f7fb; }
+
+@media (max-width: 80rem) {
+  .lf-admin-contextbar { min-block-size: 3rem; }
+  .lf-home-overview { grid-template-areas: "work work" "updates weekly"; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 47.99rem) {
+  .lf-admin-contextbar { min-block-size: 2.75rem; }
+  .lf-home-composer { grid-template-columns: minmax(0, 1fr); }
+  .lf-home-composer > div { justify-content: space-between; }
+  .lf-home-overview { grid-template-areas: "work" "updates" "weekly"; grid-template-columns: minmax(0, 1fr); }
+  .lf-home-summary__facts { grid-template-columns: minmax(0, 1fr); }
+  .lf-home-summary__facts > div + div { padding-inline-start: 0; border-block-start: 1px solid #e5e9ee; border-inline-start: 0; }
+  .lf-home-detail-list { grid-template-columns: minmax(0, 1fr); }
+  .lf-home-detail-list > div:nth-child(odd) { padding-inline-end: 0; }
+  .lf-admin-demo-tools { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 20rem) {
+  .lf-home-update-preview li { display: grid; gap: 0.25rem; }
+  .lf-home-update-preview strong { text-align: start; }
+}
+
+@media (forced-colors: active) {
+  .lf-home-command,
+  .lf-home-summary,
+  .lf-building-provenance { border: 2px solid CanvasText; }
 }

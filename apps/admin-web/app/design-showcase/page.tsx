@@ -12,7 +12,7 @@ import {
 } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "LeaseFlow 디자인 시스템",
+  title: "LeaseFlow Design System",
   description: "LeaseFlow 관리자 화면의 디자인 요소와 상태입니다.",
 };
 

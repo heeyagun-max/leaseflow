@@ -52,9 +52,9 @@ const operationsNav = [
   { href: "/operations/files", label: "파일 이력" },
 ] as const;
 const settingsNav = [
-  { href: "/settings", label: "수신자 그룹·일정" },
-  { href: "/settings/access", label: "사용자·권한" },
-  { href: "/settings/audit", label: "발송·감사 기록" },
+  { href: "/settings", label: "Recipient Groups & Schedule" },
+  { href: "/settings/access", label: "Users & Access" },
+  { href: "/settings/audit", label: "Delivery & Audit Log" },
 ] as const;
 
 function LocalNav({ current, items }: { current: string; items: readonly { href: string; label: string }[] }) {
@@ -67,8 +67,8 @@ function LocalNav({ current, items }: { current: string; items: readonly { href:
   );
 }
 
-function PageHeader({ children, title }: { children?: ReactNode; title: string }) {
-  return <header className="lf-admin-page-header"><h1 tabIndex={-1}>{title}</h1>{children ? <p>{children}</p> : null}</header>;
+function PageHeader({ title }: { title: string }) {
+  return <header className="lf-admin-page-header"><h1 tabIndex={-1}>{title}</h1></header>;
 }
 
 function Status({ children, tone = "info" }: { children: ReactNode; tone?: "error" | "info" | "neutral" | "success" | "warning" }) {
@@ -131,7 +131,7 @@ function HomePage() {
     const role = actorRole(workflow, actorId);
     const task = currentTask(workflow, role);
     return <>
-      <PageHeader title="오늘의 업무">{roleLabels[role as keyof typeof roleLabels] ?? "업무 담당자"} 역할과 현재 단계에 맞는 작업만 보여줍니다.</PageHeader>
+      <PageHeader title="오늘의 업무" />
       <section aria-labelledby="today-queue-heading">
         <div className="lf-admin-section-heading"><h2 id="today-queue-heading">내 작업 대기열</h2><span>1건</span></div>
         <ul className="lf-admin-queue">
@@ -157,7 +157,7 @@ function SourcesPage() {
     });
     return <>
       <LocalNav current="/sources" items={sourceNav} />
-      <PageHeader title="원자료">합성 원자료의 출처, 분류, 검토 상태를 행 중심으로 확인합니다.</PageHeader>
+      <PageHeader title="원자료" />
       <section aria-labelledby="source-filter-heading"><h2 id="source-filter-heading">검색과 필터</h2>
         <form className="lf-admin-filter" action="/sources" method="get">
           <label><span>파일명 또는 제공처</span><input defaultValue={params.get("query") ?? ""} name="query" type="search" /></label>
@@ -184,7 +184,7 @@ function SourceTable({ assets }: { assets: Asset[] }) {
 }
 
 function SourceNewPage() {
-  return <><LocalNav current="/sources/new" items={sourceNav} /><PageHeader title="자료 등록 안내">현재 데모에서 실제로 지원하는 등록 범위를 안내합니다.</PageHeader>
+  return <><LocalNav current="/sources/new" items={sourceNav} /><PageHeader title="자료 등록 안내" />
     <section aria-labelledby="source-new-heading" className="lf-admin-readonly"><h2 id="source-new-heading">합성 원자료만 사용</h2><p>이 해커톤 데모는 저장소에 포함된 합성 SVG·PDF·워크북만 사용합니다. 임의 파일 업로드 기능은 연결되어 있지 않아 등록 버튼을 제공하지 않습니다.</p><Link className="lf-admin-button" href="/sources">등록된 합성 원자료 보기</Link></section>
   </>;
 }
@@ -201,7 +201,7 @@ function SourceDetailPage({ sourceRef }: { sourceRef?: string }) {
     const canExtract = workflow.state.stage === "source_uploaded" && asset.extraction_state !== "unsupported" && role === "data_steward";
     const previewable = asset.document_category === "floor_plan" && asset.status === "published" && asset.observed_filenames[0]?.endsWith(".svg");
     return <>
-      <LocalNav current="" items={sourceNav} /><PageHeader title={asset.observed_filenames[0] ?? "원자료 상세"}>출처와 분류 제안을 확인한 뒤 현재 역할의 한 작업만 수행합니다.</PageHeader>
+      <LocalNav current="" items={sourceNav} /><PageHeader title={asset.observed_filenames[0] ?? "원자료 상세"} />
       <div className="lf-admin-review-grid" aria-busy={busy !== null}>
         <div>
           <section aria-labelledby="source-info-heading" className="lf-admin-surface"><h2 id="source-info-heading">자료 정보</h2><dl className="lf-admin-facts"><div><dt>자료 종류</dt><dd>{assetCategoryLabels[asset.document_category]}</dd></div><div><dt>제공처</dt><dd>{asset.source_organization}</dd></div><div><dt>파일 정보</dt><dd>{asset.extension.toUpperCase()} · {formatBytes(asset.byte_size)}</dd></div><div><dt>자료 작성일</dt><dd><time dateTime={asset.artifact_date ?? undefined}>{formatDate(asset.artifact_date)}</time></dd></div><div><dt>공유 범위</dt><dd>{confidentialityLabels[asset.confidentiality]}</dd></div><div><dt>분류 상태</dt><dd>{classificationLabels[asset.classification_state]}</dd></div></dl></section>
@@ -225,7 +225,7 @@ function ChangesPage({ publishing = false }: { publishing?: boolean }) {
     const prefix = publishing ? "/publishing" : "/changes";
     const href = `${prefix}/${encodeURIComponent(workflow.reviewBatchRef)}`;
     const available = publishing ? workflow.state.stage === "junior_confirmed" || workflow.state.stage === "published" : workflow.state.candidates.length > 0;
-    return <><PageHeader title={publishing ? "승인·게시" : "변경 검토"}>{publishing ? "1차 확인된 변경만 선임 검토자가 승인하고 게시합니다." : "원자료 근거와 현재·제안 값을 비교합니다."}</PageHeader>
+    return <><PageHeader title={publishing ? "승인·게시" : "변경 검토"} />
       <section aria-labelledby="change-queue-heading"><div className="lf-admin-section-heading"><h2 id="change-queue-heading">{publishing ? "승인 대기" : "검토 대기"}</h2><span>{available ? 1 : 0}건</span></div>
         {available ? <ul className="lf-admin-queue"><li><Link href={href}><div><h3>{workflow.source.buildingName} · 5층 변경</h3><p>{sourceFilename(workflow)}</p></div><dl><div><dt>상태</dt><dd>{publicationStageLabels[workflow.state.stage]}</dd></div><div><dt>변경</dt><dd>{workflow.state.candidates.length}개 항목</dd></div><div><dt>기준일</dt><dd><time dateTime={workflow.source.effectiveDate}>{formatDate(workflow.source.effectiveDate)}</time></dd></div></dl></Link></li></ul>
           : <Feedback title={publishing ? "현재 승인 대기 항목이 없습니다" : "현재 검토할 변경 후보가 없습니다"} message={publishing ? "데이터 담당자의 1차 확인이 끝나면 이 대기열에 표시됩니다." : "원자료에서 변경 내용을 찾으면 이 대기열에 표시됩니다."} action={!publishing ? <Link className="lf-admin-button" href={`/sources/${assetSlug(sourceFilename(workflow))}`}>원자료 확인</Link> : undefined} />}
@@ -247,7 +247,7 @@ function ReviewDetailPage({ batchRef, publishing = false }: { batchRef?: string;
     const role = actorRole(workflow, actorId);
     const canConfirm = !publishing && workflow.state.stage === "extracted_candidate" && role === "data_steward";
     const canPublish = publishing && workflow.state.stage === "junior_confirmed" && role === "senior_reviewer";
-    return <><PageHeader title={publishing ? "승인 검토" : "변경 확인"}>{workflow.source.buildingName} · 5층 · <time dateTime={workflow.source.effectiveDate}>{formatDate(workflow.source.effectiveDate)}</time></PageHeader>
+    return <><PageHeader title={publishing ? "승인 검토" : "변경 확인"} />
       <div className="lf-admin-review-grid" aria-busy={busy !== null}>
         <section aria-labelledby="comparison-heading" className="lf-admin-surface lf-admin-evidence"><h2 id="comparison-heading">근거와 비교</h2>{workflow.state.candidates.length ? <Comparison state={workflow.state} /> : <Feedback title="비교할 변경 후보가 없습니다" message="원자료에서 변경 내용을 찾은 뒤 다시 확인해 주세요." action={<Link className="lf-admin-button" href={`/sources/${assetSlug(sourceFilename(workflow))}`}>원자료로 이동</Link>} />}</section>
         <aside className="lf-admin-decision" aria-labelledby="review-decision-heading"><h2 id="review-decision-heading">{publishing ? "선임 결정" : "검토 결정"}</h2><Status tone={workflow.state.stage === "published" ? "success" : "info"}>{publicationStageLabels[workflow.state.stage]}</Status>
@@ -266,7 +266,7 @@ function OperationsPage({ view }: { view: "current" | "files" | "versions" }) {
     const state = workflow.state;
     const currentRecords = workflow.currentOperations.records;
     const currentFiles = workflow.currentOperations.files;
-    return <><LocalNav current={currentPath} items={operationsNav} /><PageHeader title={title}>{view === "current" ? "게시·활성·외부 공유 조건을 통과한 현재 정보만 우선 표시합니다." : "이전 정보는 읽기 전용이며 외부 결과에 다시 사용할 수 없습니다."}</PageHeader>
+    return <><LocalNav current={currentPath} items={operationsNav} /><PageHeader title={title} />
       {view === "current" ? <><section aria-labelledby="current-facts-heading"><h2 id="current-facts-heading">현재 사실</h2><dl className="lf-admin-ledger">{currentRecords.map((record) => <div key={record.id}><dt>{fieldLabels[record.field]}</dt><dd>{formatFieldValue(record.field, record.value)}<span>{record.floor} · 버전 {record.version_no}</span></dd></div>)}</dl></section><section aria-labelledby="current-files-heading"><h2 id="current-files-heading">최신 파일</h2>{currentFiles.length ? <ul className="lf-admin-file-list">{currentFiles.map((file) => <li key={file.id}><h3>{file.filename}</h3><Status tone="success">현재 사용</Status><p>{file.floor} · 버전 {file.version_no} · <time dateTime={file.valid_from}>{formatDate(file.valid_from)}</time>부터</p></li>)}</ul> : <Feedback title="현재 사용할 수 있는 파일이 없습니다" message="선임 승인과 게시가 끝난 파일만 외부 운영에 사용할 수 있습니다." action={<Link className="lf-admin-button" href="/publishing">승인·게시 확인</Link>} />}</section></>
         : view === "versions" ? <HistoryTable records={state.records} /> : <FileHistory files={state.files} />}
     </>;
@@ -286,7 +286,7 @@ function SettingsPage({ view }: { view: "access" | "audit" | "recipients" }) {
   const { reload, reportError, reportWorkflow } = useAdminData();
   return <DataState title="설정·기록">{(workflow) => {
     if (!workflow.canViewSettings) {
-      return <><LocalNav current={current} items={settingsNav} /><PageHeader title="설정·기록">역할에 따라 설정과 감사 기록의 열람 범위를 제한합니다.</PageHeader><section aria-labelledby="settings-permission-heading"><h2 id="settings-permission-heading">접근 권한</h2><Feedback tone="error" title="이 설정을 볼 권한이 없습니다" message="임대 관리 책임자만 수신자 구성, 사용자 권한, 감사 기록을 확인할 수 있습니다." /></section></>;
+      return <><LocalNav current={current} items={settingsNav} /><PageHeader title="Audit & Settings" /><section aria-labelledby="settings-permission-heading"><h2 id="settings-permission-heading">Access</h2><Feedback tone="error" title="You do not have access to these settings." message="Only leasing managers can review recipient configuration, user access, and audit records." /></section></>;
     }
     const config = workflow.reportConfiguration;
     const recipientRoleLabels: Record<string, string> = {
@@ -297,7 +297,7 @@ function SettingsPage({ view }: { view: "access" | "audit" | "recipients" }) {
       cc_lm_exec: "임대 관리 책임자",
     };
     const recipients = (items: readonly { email: string; role: string }[]) => items.map((item) => `${item.email} (${recipientRoleLabels[item.role] ?? item.role})`).join(", ");
-    return <><LocalNav current={current} items={settingsNav} /><PageHeader title="설정·기록">합성 데모에 실제로 저장된 수신자 구성과 보고 기간, 역할, 변경 기록을 확인합니다.</PageHeader>
+    return <><LocalNav current={current} items={settingsNav} /><PageHeader title="Audit & Settings" />
     {view === "recipients" ? config ? <><section aria-labelledby="recipient-heading"><h2 id="recipient-heading">수신자 그룹</h2><dl className="lf-admin-ledger"><div><dt>건물</dt><dd>{workflow.source.buildingName}</dd></div><div><dt>받는 사람</dt><dd>{recipients(config.recipients.to)}</dd></div><div><dt>참조</dt><dd>{recipients(config.recipients.cc)}</dd></div></dl><p className="lf-admin-readonly">합성 데모 구성 · 읽기 전용 · 수신자는 이 저장된 그룹에서 계산되며 모델이 새 수신자를 만들지 않습니다.</p></section><section aria-labelledby="schedule-heading"><h2 id="schedule-heading">보고 기간</h2><dl className="lf-admin-ledger"><div><dt>데모 보고 시작일</dt><dd><time dateTime={config.reportingPeriod.from}>{formatDate(config.reportingPeriod.from)}</time></dd></div><div><dt>데모 보고 종료일</dt><dd><time dateTime={config.reportingPeriod.to}>{formatDate(config.reportingPeriod.to)}</time></dd></div><div><dt>전달 범위</dt><dd>데모 발송 기록만 저장</dd></div></dl><p className="lf-admin-readonly">반복 일정과 자동 발송 설정은 이 데모 데이터에 포함되어 있지 않습니다.</p></section></> : <Feedback tone="error" title="보고 설정을 불러올 수 없습니다" message="저장된 수신자 구성을 확인할 수 없어 세부 정보를 표시하지 않습니다." />
       : view === "access" ? <section aria-labelledby="access-heading"><h2 id="access-heading">사용자·권한</h2><ul className="lf-admin-file-list">{workflow.users.map((user) => <li key={user.id}><h3>{user.display_name}</h3><Status>{roleLabels[user.role as keyof typeof roleLabels] ?? "업무 담당자"}</Status><p>{user.role === "data_steward" ? "원자료 분류와 변경 후보 1차 확인" : user.role === "senior_reviewer" ? "선임 승인과 게시" : "게시 정보 조회와 임대인 보고"}</p></li>)}</ul><p className="lf-admin-readonly">읽기 전용 · 이 데모는 실제 SSO나 회사 사용자 시스템과 연결되지 않습니다.</p></section>
         : <AuditRecordsState reload={reload} reportError={reportError} reportWorkflow={reportWorkflow} state={workflow.state} users={workflow.users} />}

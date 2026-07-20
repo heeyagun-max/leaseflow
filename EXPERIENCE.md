@@ -34,29 +34,29 @@ sources:
 5. 앵커는 현재 페이지의 보조 점프에만 사용하며 전역 메뉴를 흉내 내지 않는다.
 6. 필터, 검색, 정렬은 URL search params에 직렬화하여 뒤로 가기와 공유 가능한 맥락을 보존한다.
 
-### 현재 구현과 G008 기준
+### 현재 통합 서비스와 G008 기준
 
 G008 구현 전에는 `/`, `/reports`, `/mobile-preview`, `/design-showcase`만 페이지 route로 존재했고, 전역 메뉴가 `/`와 `/reports` 내부 앵커를 여러 업무 페이지처럼 표시했다. 이 진단은 구현 전 감사 기록이며 현재 상태를 설명하지 않는다.
 
-현재 구현은 `/`, `/sources`, `/changes`, `/publishing`, `/operations`, `/reports`, `/settings`의 7개 전역 업무 route와 아래 로컬·상세 route를 제공한다. `/mobile-preview`는 데모 검증 표면, `/design-showcase`는 개발 참조 표면으로 남아 있으며 관리자 전역 메뉴에는 포함하지 않는다. 각 전역 메뉴는 실제 route에 연결되고 역할에 따라 허용 행동 또는 읽기·권한 안내를 표시한다.
+현재 전역 메뉴는 사용자의 실제 업무 흐름에 맞춰 `/`, `/buildings`, `/work`, `/weekly`, `/building-updates`, `/weekly-settings`, `/settings`로 통합했다. 기존 `/sources`, `/changes`, `/publishing`, `/operations`, `/reports`는 세부 단계와 이전 데모 링크를 위한 호환 route로 남지만 전역 메뉴의 최상위 항목으로 중복 노출하지 않는다. `/mobile-preview`와 `/design-showcase`는 검증·개발 표면이며 관리자 전역 메뉴에는 포함하지 않는다.
 
 아래 표는 **구현된 canonical route 계약**이다. 이후 route를 추가할 때도 페이지와 로딩·오류·권한 상태가 존재하기 전에는 메뉴를 노출하지 않는다.
 
-G008 완료 당시 역사적 기준선은 Admin 77/77, 전체 146/146 tests, responsive 105/105였다. G009 이후 현재 최종 검증은 Admin 78/78, 전체 147/147 tests, 5/5 workspace typecheck, Admin production build 24 pages와 final 14-route viewport smoke를 통과했고 console error, HTTP failure, horizontal overflow는 모두 0이다. 최종 code review는 APPROVE, architect review는 CLEAR이며 권위 QA는 `artifacts/visual-qa/g008/G008_FINAL_QA.md`다.
+G008 완료 당시 역사적 기준선은 Admin 77/77, 전체 146/146 tests, responsive 105/105였다. 이후 통합 서비스 검증 결과는 `IMPLEMENTATION_STATUS.md`와 최신 `artifacts/visual-qa/` 기록이 소유하며, 이 역사적 수치를 현재 품질 주장으로 재사용하지 않는다.
 
 ### Canonical global route map
 
 | 순서 | 전역 메뉴 | route | 기본 페이지 목적 | 주요 역할 |
 | ---: | --- | --- | --- | --- |
-| 1 | 오늘의 업무 | `/` | 역할별 처리 대기열과 다음 인계 확인 | 모든 관리자 역할 |
-| 2 | 원자료 | `/sources` | 합성 원자료 검색·등록 범위 안내·상세 검토 | 데이터 담당자 |
-| 3 | 변경 검토 | `/changes` | 현재 게시값과 후보값의 근거 비교·1차 확인 | 데이터 담당자 |
-| 4 | 승인·게시 | `/publishing` | 선임 승인·반려·게시와 게시 결과 확인 | 선임 검토자 |
-| 5 | 운영 정보 | `/operations` | 현재 게시된 사실·파일과 버전 이력 조회 | 승인된 관리자 |
-| 6 | 임대인 보고 | `/reports` | 건물별 외부 보고 초안·패치·승인·발송 기록 | 임대 관리자 |
-| 7 | 설정·기록 | `/settings` | 수신자 그룹·접근 권한·감사 기록 | 권한 있는 관리자 |
+| 1 | 업무 홈 | `/` | 자연어 요청, 통합 대기열, 선택 근거와 다음 행동 | 모든 역할 |
+| 2 | 건물정보 | `/buildings` | 외부 업무에 사용할 수 있는 최신 건물 정보와 버전 근거 조회 | 모든 역할 |
+| 3 | 자료·업무 | `/work` | 고객 요청 확인, 최신 자료 준비, 승인과 전달 기록 | 모든 역할 |
+| 4 | 주간업무 | `/weekly` | 임대인별 건물 묶음과 건물별 보고 상태·행동 확인 | 모든 역할 |
+| 5 | 건물정보 업로드 | `/building-updates` | 원자료 등록, 변경 비교, 담당자 확인, 최종 반영 | 데이터 담당자·선임·관리자 |
+| 6 | 주간업무 설정 | `/weekly-settings` | 임대인 보고그룹, 포함 건물, 일정, 수신자, 승인자 설정 | 임대 관리자·관리자 |
+| 7 | 설정·기록 | `/settings` | 사용자·권한, 업무 관계, 감사 기록 | 권한 있는 관리자 |
 
-`대시보드`, `건물`, `보고그룹`, `보고일정`, `사용자·권한`, `발송·감사`를 각각 긴 전역 메뉴로 유지하지 않는다. 사용자의 실제 흐름에 따라 오늘의 업무, 운영 정보, 임대인 보고, 설정·기록 안으로 재배치한다. 도메인 책임은 삭제하지 않고 탐색 계층만 정리한다.
+사이드바에는 위 한국어 이름을 사용한다. 본문 상단의 짧은 영문 위치 표시는 각각 `Workspace`, `Buildings`, `Requests`, `Weekly reports`, `Data intake`, `Report automation`, `Audit & settings`를 사용하며 새로운 메뉴로 동작하지 않는다.
 
 ### Local navigation route map
 

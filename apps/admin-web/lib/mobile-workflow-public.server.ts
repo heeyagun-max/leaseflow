@@ -22,6 +22,44 @@ const schema = z.object({
 
 export type PublicWorkflow = z.infer<typeof schema>;
 
+const publicFactLabels: Record<string, string> = {
+  marketed_area_py: "임대 가능 면적",
+  "Marketed area": "임대 가능 면적",
+  rent_free_months: "렌트프리",
+  "Rent-free": "렌트프리",
+  supported_parking_spaces: "지원 주차",
+  "Supported parking": "지원 주차",
+};
+const publicUnits: Record<string, string> = { py: "평", months: "개월", spaces: "대" };
+
+export function renderPublicPackageBody(
+  facts: readonly { label: string; value: number; unit: string }[],
+  files: readonly { filename: string }[],
+  tone: "neutral" | "concise_courteous" | "formal" = "neutral",
+): string {
+  const factLines = facts.map((fact) => `- ${publicFactLabels[fact.label] ?? "임대 정보"}: ${fact.value}${publicUnits[fact.unit] ?? fact.unit}`);
+  const fileLines = files.map((file) => `- 첨부 자료: ${file.filename}`);
+  const copy = {
+    neutral: ["안녕하세요. 요청하신 현재 임대 정보를 안내드립니다.", "내용을 확인한 뒤 전달해 주세요."],
+    concise_courteous: ["안녕하세요. 요청하신 최신 임대 정보를 간단히 정리했습니다.", "확인 부탁드립니다. 감사합니다."],
+    formal: ["안녕하십니까. 요청하신 현재 임대 정보를 아래와 같이 안내드립니다.", "검토 부탁드립니다.\n감사합니다."],
+  } as const;
+  return [
+    copy[tone][0],
+    "",
+    ...factLines,
+    ...fileLines,
+    "",
+    copy[tone][1],
+  ].join("\n");
+}
+
+function publicToneFor(body: string): "neutral" | "concise_courteous" | "formal" {
+  if (body.startsWith("Hello,")) return "concise_courteous";
+  if (body.startsWith("Please find below")) return "formal";
+  return "neutral";
+}
+
 export function toPublicWorkflow(state: DemoState): PublicWorkflow {
   return schema.parse({
     revision: state.revision, publication_stage: state.stage,
@@ -32,11 +70,15 @@ export function toPublicWorkflow(state: DemoState): PublicWorkflow {
         recipient: request.extraction.recipient, deadline: request.extraction.deadline, ambiguities: request.extraction.ambiguities },
     })),
     packages: state.operations.packages.map((pkg) => ({
-      id: pkg.id, building_id: pkg.building_id, floor: pkg.floor, status: pkg.status, subject: pkg.subject, body: pkg.body,
+      id: pkg.id, building_id: pkg.building_id, floor: pkg.floor, status: pkg.status, subject: pkg.subject,
+      body: renderPublicPackageBody(pkg.facts, pkg.files, publicToneFor(pkg.body)),
       facts: pkg.facts.map(({ label, value, unit, version_id, source_pointer }) => ({ label, value, unit, version_id, source_pointer })),
       files: pkg.files.map(({ filename, version_id, source_pointer }) => ({ filename, version_id, source_pointer })),
       recipients: pkg.recipients, unresolved: pkg.unresolved, protected_material_status: "verified" as const,
-      edit_candidate: pkg.edit_candidate ? { subject: pkg.edit_candidate.subject, body: pkg.edit_candidate.body } : null,
+      edit_candidate: pkg.edit_candidate ? {
+        subject: pkg.edit_candidate.subject,
+        body: renderPublicPackageBody(pkg.facts, pkg.files, publicToneFor(pkg.edit_candidate.body)),
+      } : null,
     })),
     activities: state.operations.activities.map(({ event_type, package_id, building_id, occurred_at, summary }) => ({ event_type, package_id, building_id, occurred_at, summary })),
     audit: [...state.audit, ...state.operations.audit].map((event) => ({ event_label: event.event_type, occurred_at: event.occurred_at })),

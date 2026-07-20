@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LeaseFlow 통합 서비스 IA v2</title>
+  <style>
+    :root {
+      --ink:#13283b; --ink2:#385065; --muted:#6f8392; --paper:#f3f6f7; --surface:#fff;
+      --line:#d6e1e6; --navy:#173e5d; --teal:#187c77; --teal2:#e3f2f0; --amber:#d39228; --amber2:#fff2dc;
+      --blue2:#e9f1f7; --soft:#f7fafb;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:2400px; height:1600px; overflow:hidden; }
+    body {
+      font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; color:var(--ink);
+      background:radial-gradient(circle at 90% 0%,rgba(24,124,119,.11),transparent 27%),linear-gradient(140deg,#fbfcfc,var(--paper));
+    }
+    .canvas { width:100%; height:100%; padding:70px 76px 62px; }
+    header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:34px; }
+    .eyebrow { color:var(--teal); font-size:22px; font-weight:850; letter-spacing:.045em; margin-bottom:10px; }
+    h1 { margin:0; font-size:68px; line-height:1.08; letter-spacing:-.045em; }
+    .subtitle { margin:16px 0 0; color:var(--ink2); font-size:26px; font-weight:520; }
+    .thesis { width:700px; padding:22px 26px; border-radius:16px; background:white; border:1px solid #b9d5d1; border-left:8px solid var(--teal); box-shadow:0 14px 38px rgba(20,48,66,.07); color:var(--ink2); font-size:23px; line-height:1.48; }
+    .thesis strong { color:var(--ink); }
+    .layout { display:grid; grid-template-columns:650px 1fr; gap:30px; height:1314px; }
+    .panel { background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:22px; box-shadow:0 18px 48px rgba(23,50,68,.075); }
+
+    .nav { padding:28px; }
+    .section-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+    .section-head h2 { margin:0; font-size:30px; letter-spacing:-.02em; }
+    .section-head span { color:var(--muted); font-size:17px; }
+    .group-label { margin:20px 0 10px; display:flex; align-items:center; gap:10px; color:var(--muted); font-size:16px; font-weight:850; letter-spacing:.04em; }
+    .group-label:after { content:""; flex:1; border-top:1px solid var(--line); }
+    .menu-list { display:grid; gap:10px; }
+    .menu {
+      min-height:114px; display:grid; grid-template-columns:54px 190px 1fr; gap:13px; align-items:center;
+      border:1px solid var(--line); border-radius:15px; padding:14px 16px; background:#fbfcfd;
+    }
+    .menu.core { border-left:5px solid var(--navy); }
+    .menu.nl { background:var(--teal2); border-color:#9cc9c5; border-left:5px solid var(--teal); }
+    .menu.web { background:var(--amber2); border-color:#ebca90; border-left:5px solid var(--amber); }
+    .menu.utility { min-height:88px; background:var(--soft); }
+    .num { width:44px; height:44px; display:grid; place-items:center; border-radius:12px; background:var(--blue2); color:var(--navy); font-size:19px; font-weight:900; }
+    .nl .num { background:var(--teal); color:white; }
+    .web .num { background:var(--amber); color:white; }
+    .menu-name { font-size:24px; font-weight:850; letter-spacing:-.02em; }
+    .menu-desc { color:var(--ink2); font-size:17px; line-height:1.42; }
+    .menu-desc b { color:var(--ink); }
+    .role-note { margin-top:17px; border-radius:13px; padding:15px 17px; background:#f0f5f7; color:var(--ink2); font-size:16px; line-height:1.42; }
+
+    .right { display:grid; grid-template-rows:370px 1fr 238px; gap:24px; }
+    .concept { display:grid; grid-template-columns:1.1fr .9fr; overflow:hidden; }
+    .concept-copy { padding:28px 30px; display:flex; flex-direction:column; justify-content:center; }
+    .concept-copy small { color:var(--teal); font-size:16px; font-weight:900; letter-spacing:.05em; }
+    .concept-copy h2 { margin:9px 0 13px; font-size:34px; letter-spacing:-.025em; }
+    .concept-copy p { margin:0; color:var(--ink2); font-size:20px; line-height:1.55; }
+    .platforms { margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .platform { padding:14px 15px; border-radius:12px; border:1px solid var(--line); background:var(--soft); }
+    .platform b { font-size:18px; }
+    .platform span { display:block; margin-top:4px; color:var(--muted); font-size:14px; }
+    .concept-visual { overflow:hidden; background:#fbfcfc; border-left:1px solid var(--line); }
+    .concept-visual img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+    .middle { display:grid; grid-template-columns:.94fr 1.06fr; gap:24px; }
+    .language, .matrix { padding:28px 30px; }
+    .language h2, .matrix h2 { margin:0; font-size:30px; }
+    .language > p, .matrix > p { margin:8px 0 18px; color:var(--muted); font-size:17px; }
+    .prompt-box { padding:17px 18px; border-radius:14px; border:1px solid #9fcac6; background:var(--teal2); }
+    .prompt-label { color:#2c6c68; font-size:14px; font-weight:900; letter-spacing:.05em; }
+    .prompt { margin-top:8px; color:var(--ink); font-size:22px; line-height:1.4; font-weight:750; }
+    .examples { margin-top:14px; display:grid; gap:10px; }
+    .example { padding:13px 15px; border-radius:12px; background:var(--soft); border:1px solid var(--line); color:var(--ink2); font-size:16px; line-height:1.35; }
+    .result-flow { margin-top:16px; display:grid; grid-template-columns:1fr 34px 1fr 34px 1fr; align-items:center; }
+    .result { min-height:95px; display:flex; align-items:center; justify-content:center; text-align:center; padding:12px; border-radius:12px; background:#f7fafb; border-top:4px solid var(--navy); font-size:16px; font-weight:750; line-height:1.35; }
+    .arr { text-align:center; color:var(--teal); font-size:24px; }
+
+    .table { display:grid; grid-template-columns:1.35fr .54fr .54fr; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    .th, .td { padding:12px 14px; border-bottom:1px solid var(--line); font-size:16px; display:flex; align-items:center; }
+    .th { background:var(--navy); color:white; font-weight:850; }
+    .th.center, .td.center { justify-content:center; text-align:center; }
+    .td { background:white; color:var(--ink2); }
+    .td.name { color:var(--ink); font-weight:760; }
+    .table > :nth-last-child(-n+3) { border-bottom:0; }
+    .yes { color:#176f69; font-weight:900; }
+    .only { color:#9a6517; font-weight:900; }
+    .matrix-note { margin-top:14px; border-radius:11px; padding:13px 15px; background:var(--amber2); color:#79531e; font-size:15px; line-height:1.4; }
+
+    .contract { padding:24px 28px; display:grid; grid-template-columns:1.15fr repeat(4,1fr); gap:15px; align-items:stretch; }
+    .contract-title { display:flex; flex-direction:column; justify-content:center; }
+    .contract-title small { color:var(--teal); font-size:15px; font-weight:900; letter-spacing:.05em; }
+    .contract-title h2 { margin:7px 0 0; font-size:28px; }
+    .contract-item { padding:15px 16px; border-radius:12px; background:var(--soft); border-left:4px solid var(--teal); display:flex; flex-direction:column; justify-content:center; }
+    .contract-item b { font-size:17px; }
+    .contract-item span { margin-top:5px; color:var(--muted); font-size:14px; line-height:1.38; }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <header>
+      <div>
+        <div class="eyebrow">LEASEFLOW · UNIFIED WEB & MOBILE SERVICE IA · V2</div>
+        <h1>웹은 앱의 데스크톱 버전이고, 관리 기능은 그 위에 더해진다</h1>
+        <p class="subtitle">사무실과 현장에서 같은 건물정보·자연어 업무·업무기록을 이어서 사용하는 하나의 서비스</p>
+      </div>
+      <div class="thesis"><strong>새 웹 컨셉</strong><br>모든 팀원이 웹에서 앱과 동일한 업무를 수행한다. 권한 있는 사용자에게만 `건물정보 업로드`와 `주간업무 설정`이 추가된다.</div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel nav">
+        <div class="section-head"><h2>웹 메뉴 구조</h2><span>공통 업무 + 웹 전용 확장</span></div>
+
+        <div class="group-label">웹·앱 공통 업무</div>
+        <div class="menu-list">
+          <div class="menu core nl"><div class="num">01</div><div class="menu-name">업무 홈</div><div class="menu-desc"><b>자연어 업무창</b><br>오늘 할 일 · 최근 건물 · 진행 요청 · 임대인 미팅</div></div>
+          <div class="menu core"><div class="num">02</div><div class="menu-name">건물정보</div><div class="menu-desc"><b>최신 건물정보 검색</b><br>공실 · 면적 · 층 · 조건 · 도면 · 변경 이력</div></div>
+          <div class="menu core"><div class="num">03</div><div class="menu-name">자료·업무</div><div class="menu-desc"><b>자료 찾기와 업무 실행</b><br>자료 묶음 · 메일 준비 · 회신·보완 스레드</div></div>
+          <div class="menu core"><div class="num">04</div><div class="menu-name">주간업무</div><div class="menu-desc"><b>임대인 미팅 준비</b><br>이번 주 이슈 · 건물별 현황 · 보고 초안 · 이력</div></div>
+        </div>
+
+        <div class="group-label">웹에서 추가되는 운영 기능</div>
+        <div class="menu-list">
+          <div class="menu web"><div class="num">05</div><div class="menu-name">건물정보 업로드</div><div class="menu-desc"><b>신규 자료 등록</b><br>파일 올리기 · 자동 분류 · 변경 확인 · 최신정보 반영</div></div>
+          <div class="menu web"><div class="num">06</div><div class="menu-name">주간업무 설정</div><div class="menu-desc"><b>임대인별 자동화</b><br>보고그룹 · 포함 건물 · 일정 · 수신자 · 승인자</div></div>
+          <div class="menu utility"><div class="num">07</div><div class="menu-name">설정·기록</div><div class="menu-desc">사용자·권한 · 임대인·건물 관계 · 감사기록</div></div>
+        </div>
+        <div class="role-note"><b>메뉴 노출 원칙</b> · 일반 팀원에게는 01–04가 중심이다. 05–07은 담당 역할과 권한에 따라 추가로 나타난다.</div>
+      </aside>
+
+      <div class="right">
+        <section class="panel concept">
+          <div class="concept-copy">
+            <small>ONE PRODUCT · TWO SURFACES</small>
+            <h2>웹과 앱은 같은 서비스에 접속한다</h2>
+            <p>건물정보, 자료, 업무 스레드, 주간 이슈는 하나의 공통 데이터다. 사무실에서는 넓은 화면과 키보드로, 현장에서는 모바일과 음성으로 같은 업무를 이어간다.</p>
+            <div class="platforms">
+              <div class="platform"><b>웹 · 사무실</b><span>자연어 검색 · 비교 · 편집 · 대량 자료 확인</span></div>
+              <div class="platform"><b>앱 · 현장</b><span>자연어·음성 · 빠른 조회 · 자료 준비 · 업무 기록</span></div>
+            </div>
+          </div>
+          <div class="concept-visual"><img src="leaseflow-unified-web-mobile-concept-v2.png" alt="웹과 모바일이 공통 건물정보를 사용하는 개념도" /></div>
+        </section>
+
+        <div class="middle">
+          <section class="panel language">
+            <h2>업무 홈의 중심은 자연어 업무창</h2>
+            <p>메뉴를 찾아다니기 전에 사용자가 하려는 일을 바로 입력한다.</p>
+            <div class="prompt-box"><div class="prompt-label">자연어 요청</div><div class="prompt">“퍼시픽타워 최신 도면하고 임대조건 보여줘.”</div></div>
+            <div class="examples">
+              <div class="example">“강남에서 500평 이상, 즉시 입주 가능한 건물 찾아줘.”</div>
+              <div class="example">“이번 주 ○○자산운용 미팅에 들어갈 이슈 정리해줘.”</div>
+              <div class="example">“지난달 KFT 면적 변경자료와 이전 도면 비교해줘.”</div>
+            </div>
+            <div class="result-flow">
+              <div class="result">요청 의도·조건 확인</div><div class="arr">→</div>
+              <div class="result">권한 내 최신정보·근거 검색</div><div class="arr">→</div>
+              <div class="result">결과·자료·다음 행동 제안</div>
+            </div>
+          </section>
+
+          <section class="panel matrix">
+            <h2>기능 제공 기준</h2>
+            <p>기본 업무는 동일하고, 정보관리 기능만 웹에 확장된다.</p>
+            <div class="table">
+              <div class="th">기능</div><div class="th center">웹</div><div class="th center">앱</div>
+              <div class="td name">자연어·음성 업무 요청</div><div class="td center yes">제공</div><div class="td center yes">제공</div>
+              <div class="td name">건물정보·최신 자료 검색</div><div class="td center yes">제공</div><div class="td center yes">제공</div>
+              <div class="td name">자료 묶음·메일 준비·업무 스레드</div><div class="td center yes">제공</div><div class="td center yes">제공</div>
+              <div class="td name">주간 이슈·보고서 확인</div><div class="td center yes">제공</div><div class="td center yes">제공</div>
+              <div class="td name">신규 건물정보 업로드·변경 확인</div><div class="td center only">웹 전용</div><div class="td center">—</div>
+              <div class="td name">임대인별 주간업무 자동화 설정</div><div class="td center only">웹 전용</div><div class="td center">—</div>
+            </div>
+            <div class="matrix-note"><b>같은 계정·같은 권한·같은 최신정보</b>를 사용한다. 기기를 바꿔도 검색 조건, 업무 스레드, 보고 준비 상태가 이어져야 한다.</div>
+          </section>
+        </div>
+
+        <section class="panel contract">
+          <div class="contract-title"><small>SHARED DATA CONTRACT</small><h2>신규 정보가 팀의 공통 자산이 되는 조건</h2></div>
+          <div class="contract-item"><b>원본은 즉시 자산화</b><span>업로드 파일과 수신정보를 원본 그대로 보관</span></div>
+          <div class="contract-item"><b>새 정보는 먼저 후보</b><span>추출값과 변경내용은 담당자 확인 전까지 미게시</span></div>
+          <div class="contract-item"><b>확인 후 모두가 사용</b><span>승인된 최신정보가 권한 내 웹·앱 검색에 반영</span></div>
+          <div class="contract-item"><b>같은 정보로 주간보고</b><span>임대인별 보고도 동일한 최신값과 업무기록을 참조</span></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

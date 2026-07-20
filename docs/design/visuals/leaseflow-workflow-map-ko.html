@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LeaseFlow 사용자 업무 워크플로</title>
+  <style>
+    :root {
+      --ink:#12283b; --ink2:#385064; --muted:#718492; --paper:#f4f7f8; --surface:#fff;
+      --line:#d8e2e7; --navy:#173d5b; --teal:#167c76; --teal2:#dff0ee; --amber:#d49329; --amber2:#fff2dc;
+      --blue2:#e9f1f7; --red2:#fff0ed;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:2400px; height:1500px; overflow:hidden; }
+    body { font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; color:var(--ink); background:linear-gradient(140deg,#fbfcfc,var(--paper)); }
+    .canvas { width:100%; height:100%; padding:66px 76px 58px; position:relative; }
+    header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:34px; }
+    .eyebrow { color:var(--teal); font-size:22px; font-weight:850; letter-spacing:.04em; margin-bottom:10px; }
+    h1 { margin:0; font-size:64px; line-height:1.1; letter-spacing:-.04em; }
+    .subtitle { margin:15px 0 0; color:var(--ink2); font-size:25px; }
+    .value { display:flex; gap:12px; }
+    .value span { border-radius:999px; padding:13px 18px; background:white; border:1px solid var(--line); font-size:18px; font-weight:800; box-shadow:0 8px 24px rgba(20,45,62,.05); }
+    .value .hot { background:var(--teal2); border-color:#a9cfca; color:#215e5a; }
+
+    .flow-card { background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:24px; box-shadow:0 18px 52px rgba(27,52,70,.08); padding:26px 30px 30px; }
+    .lanes { display:grid; grid-template-columns:210px repeat(8,1fr); min-height:780px; }
+    .corner { border-bottom:1px solid var(--line); padding:13px 14px; color:var(--muted); font-size:17px; font-weight:800; }
+    .step-head { border-bottom:1px solid var(--line); padding:11px 8px 15px; text-align:center; }
+    .step-no { display:inline-grid; place-items:center; width:36px; height:36px; border-radius:11px; background:var(--blue2); color:var(--navy); font-weight:900; font-size:17px; }
+    .step-head b { display:block; margin-top:8px; font-size:17px; }
+    .lane-name { display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--line); border-bottom:1px solid var(--line); padding:18px; }
+    .lane-name b { font-size:21px; }
+    .lane-name span { margin-top:6px; font-size:15px; line-height:1.35; color:var(--muted); }
+    .cell { position:relative; min-height:178px; border-right:1px dashed #dfe7eb; border-bottom:1px solid var(--line); padding:15px 10px; display:flex; align-items:center; justify-content:center; }
+    .cell:last-child { border-right:0; }
+    .task { width:100%; min-height:116px; border-radius:14px; border:1px solid var(--line); background:#fafcfc; padding:15px 13px; display:flex; flex-direction:column; justify-content:center; position:relative; box-shadow:0 7px 20px rgba(27,52,70,.05); }
+    .task:after { content:"→"; position:absolute; right:-23px; top:40%; z-index:3; font-size:27px; color:#82a09f; font-weight:500; }
+    .cell:nth-child(9n) .task:after, .task.end:after { display:none; }
+    .task b { font-size:18px; line-height:1.28; }
+    .task span { margin-top:7px; color:var(--muted); font-size:14px; line-height:1.38; }
+    .task.source { border-top:4px solid #7196ad; }
+    .task.review { border-top:4px solid var(--teal); background:#f5fbfa; }
+    .task.truth { border-top:4px solid var(--navy); background:var(--blue2); }
+    .task.report { border-top:4px solid var(--amber); background:var(--amber2); }
+    .task.app { border-top:4px solid var(--teal); background:var(--teal2); }
+    .task.block { border-top:4px solid #c75e4d; background:var(--red2); }
+    .ghost { color:#a2b0ba; font-size:14px; text-align:center; }
+    .note { position:absolute; left:10px; right:10px; bottom:10px; border-radius:9px; padding:8px; background:#edf5f4; color:#376a66; font-size:12px; text-align:center; font-weight:700; }
+
+    .bottom { display:grid; grid-template-columns:1.24fr .76fr; gap:24px; margin-top:26px; }
+    .automation, .outcome { background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:22px; box-shadow:0 16px 44px rgba(27,52,70,.07); padding:27px 30px; }
+    .panel-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:19px; }
+    .panel-head h2 { margin:0; font-size:30px; }
+    .panel-head span { color:var(--muted); font-size:17px; }
+    .auto-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:13px; }
+    .auto { border-radius:13px; background:#f7fafb; border:1px solid var(--line); padding:15px 16px; }
+    .auto .k { color:var(--teal); font-size:13px; font-weight:900; letter-spacing:.05em; }
+    .auto b { display:block; margin-top:6px; font-size:18px; }
+    .auto p { margin:6px 0 0; color:var(--muted); font-size:14px; line-height:1.35; }
+    .outcome-list { display:grid; gap:11px; }
+    .outcome-row { display:grid; grid-template-columns:42px 1fr; gap:12px; align-items:center; padding:13px 14px; border-radius:13px; background:#f7fafb; }
+    .outcome-row .icon { display:grid; place-items:center; width:36px; height:36px; border-radius:10px; background:var(--navy); color:white; font-weight:900; }
+    .outcome-row b { font-size:17px; }
+    .outcome-row span { display:block; margin-top:3px; font-size:14px; color:var(--muted); }
+    footer { margin-top:18px; display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:16px; }
+    footer strong { color:var(--ink2); }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <header>
+      <div>
+        <div class="eyebrow">LEASEFLOW · END-TO-END USER WORKFLOW</div>
+        <h1>원자료를 다시 찾지 않아도 주간 미팅과 현장 업무가 준비되는 흐름</h1>
+        <p class="subtitle">사용자는 달라진 내용만 확인하고, 시스템은 승인된 최신정보를 보고서와 앱에 연결한다</p>
+      </div>
+      <div class="value"><span>한 번 등록</span><span>달라진 것만 확인</span><span class="hot">보고서·앱 동시 활용</span></div>
+    </header>
+
+    <section class="flow-card">
+      <div class="lanes">
+        <div class="corner">역할 / 단계</div>
+        <div class="step-head"><span class="step-no">1</span><b>받은 자료 등록</b></div>
+        <div class="step-head"><span class="step-no">2</span><b>대상 연결</b></div>
+        <div class="step-head"><span class="step-no">3</span><b>내용 추출</b></div>
+        <div class="step-head"><span class="step-no">4</span><b>변경 확인</b></div>
+        <div class="step-head"><span class="step-no">5</span><b>승인·게시</b></div>
+        <div class="step-head"><span class="step-no">6</span><b>주간 이슈 수집</b></div>
+        <div class="step-head"><span class="step-no">7</span><b>임대인별 취합</b></div>
+        <div class="step-head"><span class="step-no">8</span><b>검토·사용</b></div>
+
+        <div class="lane-name"><b>임대인 원자료</b><span>PDF · 엑셀 · 도면 · 이메일 첨부</span></div>
+        <div class="cell"><div class="task source"><b>원본 파일 등록</b><span>받은 그대로 보관하고 수신일·보낸 사람을 기록</span></div></div>
+        <div class="cell"><div class="task source"><b>임대인·건물 제안</b><span>자료 종류와 적용 대상을 자동 분류</span></div></div>
+        <div class="cell"><div class="task source"><b>정보 후보 생성</b><span>면적·층·입주일·조건·도면 버전 등을 제안</span></div></div>
+        <div class="cell"><div class="ghost">원자료는<br>원본 상태 유지</div></div>
+        <div class="cell"><div class="ghost">직접 게시되지 않음</div></div>
+        <div class="cell"><div class="ghost">보고 근거로 연결</div></div>
+        <div class="cell"><div class="ghost">건물별 출처 유지</div></div>
+        <div class="cell"><div class="ghost">필요 시 원본 확인</div></div>
+
+        <div class="lane-name"><b>관리자 웹</b><span>자료 담당자 → 시니어 검토자</span></div>
+        <div class="cell"><div class="task review"><b>등록 누락 확인</b><span>중복·잘못된 파일·필수 정보 누락 안내</span></div></div>
+        <div class="cell"><div class="task review"><b>건물 연결 확정</b><span>하나의 원본을 정확한 자산에 연결</span></div></div>
+        <div class="cell"><div class="task review"><b>추출값 확인</b><span>원문과 후보값을 같은 화면에서 대조</span></div></div>
+        <div class="cell"><div class="task review"><b>이전값과 비교</b><span>바뀐 필드만 강조하고 유지·변경·보완 결정</span></div></div>
+        <div class="cell"><div class="task review"><b>시니어 승인</b><span>승인된 변경만 현재 운영정보로 게시</span></div></div>
+        <div class="cell"><div class="task review"><b>업무 활동 연결</b><span>문의·투어·제안·협의·요청·누락을 건물별 수집</span></div></div>
+        <div class="cell"><div class="task report"><b>보고 초안 검토</b><span>임대인 아래 여러 건물 이슈를 한 묶음으로 확인</span></div></div>
+        <div class="cell"><div class="task report end"><b>최종 승인</b><span>미팅 자료와 외부 전달 내용을 정확히 확인</span></div></div>
+
+        <div class="lane-name"><b>최신 운영정보</b><span>건물별 단일 현재값과 파일 버전</span></div>
+        <div class="cell"><div class="task block"><b>공식정보 변경 금지</b><span>자료 등록만으로 현재값을 덮어쓰지 않음</span></div></div>
+        <div class="cell"><div class="ghost">권한 범위 확인</div></div>
+        <div class="cell"><div class="ghost">후보 상태</div></div>
+        <div class="cell"><div class="ghost">검토 중</div></div>
+        <div class="cell"><div class="task truth"><b>게시된 현재값</b><span>활성 · 권한 허용 · 외부 공유 가능 여부 포함</span></div></div>
+        <div class="cell"><div class="task truth"><b>보고 기준 사실</b><span>보고기간 중 유효했던 정보와 변경 이력 제공</span></div></div>
+        <div class="cell"><div class="task truth"><b>건물 섹션 근거</b><span>각 문장과 첨부가 참조한 정보 버전 유지</span></div></div>
+        <div class="cell"><div class="task truth end"><b>감사기록</b><span>누가 무엇을 보고 승인·사용했는지 보존</span></div></div>
+
+        <div class="lane-name"><b>주간보고·앱</b><span>같은 최신정보를 서로 다른 업무에 재사용</span></div>
+        <div class="cell"><div class="ghost">아직 사용하지 않음</div></div>
+        <div class="cell"><div class="ghost">건물 권한 적용</div></div>
+        <div class="cell"><div class="ghost">미확인 후보 숨김</div></div>
+        <div class="cell"><div class="ghost">승인 전 숨김</div></div>
+        <div class="cell"><div class="task app"><b>앱 자동 반영</b><span>현장에는 최신 게시본만 제공</span></div></div>
+        <div class="cell"><div class="task report"><b>이번 주 이슈 생성</b><span>최신정보 변경 + 업무 활동 + 누락·위험을 수집</span></div></div>
+        <div class="cell"><div class="task report"><b>임대인 보고 구성</b><span>전체 요약 아래에 건물 A·B·C 섹션을 조합</span></div></div>
+        <div class="cell"><div class="task app end"><b>미팅·현장 사용</b><span>주간 미팅 자료와 앱이 동일한 현재값을 사용</span></div></div>
+      </div>
+    </section>
+
+    <section class="bottom">
+      <div class="automation">
+        <div class="panel-head"><h2>주간업무보고 › 자동화 설정</h2><span>설정은 한 번, 매주 보고 실행은 새로 생성</span></div>
+        <div class="auto-grid">
+          <div class="auto"><div class="k">01 · 보고 범위</div><b>임대인·보고그룹</b><p>포함 건물과 담당팀을 지정</p></div>
+          <div class="auto"><div class="k">02 · 수집 기준</div><b>기간·이슈 유형</b><p>활동·변경·누락·위험 범위</p></div>
+          <div class="auto"><div class="k">03 · 준비 일정</div><b>취합·검토·미팅</b><p>사전 요약과 최종 마감 시각</p></div>
+          <div class="auto"><div class="k">04 · 외부 전달</div><b>수신자·승인자</b><p>To/Cc·양식·언어·첨부 범위</p></div>
+        </div>
+      </div>
+      <div class="outcome">
+        <div class="panel-head"><h2>사용자가 체감하는 변화</h2><span>업무가 줄어드는 지점</span></div>
+        <div class="outcome-list">
+          <div class="outcome-row"><div class="icon">1</div><div><b>자료를 매주 다시 찾지 않는다</b><span>원자료와 최신값, 보고 근거가 연결됨</span></div></div>
+          <div class="outcome-row"><div class="icon">2</div><div><b>달라진 내용만 확인한다</b><span>전체 문서를 재검토하지 않고 변경점에 집중</span></div></div>
+          <div class="outcome-row"><div class="icon">3</div><div><b>보고서와 앱이 서로 어긋나지 않는다</b><span>둘 다 같은 승인된 현재정보를 참조</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <footer><span><strong>핵심 운영 원칙</strong> · AI는 후보를 만들고, 사람과 규칙이 최신정보·보고서·앱 제공을 확정한다.</span><span>LeaseFlow · UX/IA concept</span></footer>
+  </main>
+</body>
+</html>

@@ -1,3 +1,5 @@
+import { fetchOperationsSnapshot, OperationsSnapshotHttpError } from "./operations-snapshot";
+
 export const REPORT_INVESTIGATION_COMMANDS = [
   "통화내용 확인해서 이번주 변동사항 업데이트 해",
   "이메일 확인해서 이번주 변동사항 업데이트 해",
@@ -73,7 +75,7 @@ export interface MobileReportWorkflowView {
 }
 
 export type ReportWorkflowAction =
-  | { action: "draft" }
+  | { action: "draft"; building_id: string }
   | { action: "investigate"; report_id: string; command: ReportInvestigationCommand }
   | { action: "decide_patch"; report_id: string; decision: "accept" | "reject" }
   | { action: "approve"; report_id: string }
@@ -134,9 +136,18 @@ async function readResponse(response: Response): Promise<MobileReportWorkflowVie
 export async function fetchMobileReports(
   options: ReportWorkflowClientOptions = {},
 ): Promise<MobileReportWorkflowView> {
-  return readResponse(await (options.fetcher ?? fetch)(endpoint(options), {
-    headers: { Accept: "application/json" },
-  }));
+  try {
+    return (await fetchOperationsSnapshot(options)).reports;
+  } catch (error) {
+    if (error instanceof OperationsSnapshotHttpError) {
+      throw new ReportWorkflowHttpError(error.status, {
+        ...(error.code ? { code: error.code } : {}),
+        error: error.message,
+        ...(error.currentRevision === undefined ? {} : { current_revision: error.currentRevision }),
+      });
+    }
+    throw error;
+  }
 }
 
 export async function mutateMobileReports(

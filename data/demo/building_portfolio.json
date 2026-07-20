@@ -1,0 +1,44 @@
+[
+  {
+    "building_id": "bld-cobalt",
+    "building_name": "Cobalt Finance Center",
+    "search_aliases": ["코발트 파이낸스 센터", "코발트 센터", "CFC"],
+    "landlord_name": "한빛자산운용",
+    "market": "CBD",
+    "latest_changed_at": "2026-07-18T09:00:00+09:00",
+    "available_floors": ["5F"],
+    "marketed_area_py": 300,
+    "availability": "즉시",
+    "status": "published",
+    "active": true,
+    "external_shareable": true
+  },
+  {
+    "building_id": "bld-pacific-gate",
+    "building_name": "Pacific Gate Tower",
+    "search_aliases": ["퍼시픽타워", "퍼시픽 게이트", "PGT"],
+    "landlord_name": "한빛자산운용",
+    "market": "CBD",
+    "latest_changed_at": "2026-07-17T16:20:00+09:00",
+    "available_floors": ["8F", "12F"],
+    "marketed_area_py": 640,
+    "availability": "즉시",
+    "status": "published",
+    "active": true,
+    "external_shareable": true
+  },
+  {
+    "building_id": "bld-teheran-link",
+    "building_name": "Teheran Link",
+    "search_aliases": ["테헤란 링크", "TL"],
+    "landlord_name": "서린리츠",
+    "market": "GBD",
+    "latest_changed_at": "2026-07-16T11:40:00+09:00",
+    "available_floors": ["3F"],
+    "marketed_area_py": 215,
+    "availability": "협의",
+    "status": "published",
+    "active": true,
+    "external_shareable": true
+  }
+]

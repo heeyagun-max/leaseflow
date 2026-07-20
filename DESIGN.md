@@ -10,32 +10,32 @@ sources:
   - docs/design/LEASEFLOW_SERVICE_LAYER_AND_DESIGN_MANIFEST_v3.0.0_KO.md
   - docs/design/LEASEFLOW_ADMIN_G008_DESIGN_READ_KO.md
 colors:
-  canvas: '#F7F4ED'
-  canvas-deep: '#ECE7DC'
-  surface: '#FFFEFB'
-  surface-subtle: '#F1EDE4'
-  surface-disabled: '#E9E5DC'
-  ink: '#23211F'
-  ink-secondary: '#625E57'
-  ink-disabled: '#827D75'
-  rail: '#132B3A'
-  rail-text: '#F7F4ED'
-  rail-muted: '#B8C6D0'
-  cobalt: '#1F5FAE'
-  cobalt-pressed: '#174A89'
-  cobalt-wash: '#E8F0FA'
-  focus-on-light: '#1F5FAE'
+  canvas: '#F3F5F7'
+  canvas-deep: '#E7EBF0'
+  surface: '#FFFFFF'
+  surface-subtle: '#EEF1F5'
+  surface-disabled: '#E4E8ED'
+  ink: '#17212B'
+  ink-secondary: '#687483'
+  ink-disabled: '#8994A1'
+  rail: '#16202A'
+  rail-text: '#F3F5F7'
+  rail-muted: '#AAB5C1'
+  cobalt: '#355F9C'
+  cobalt-pressed: '#284A7C'
+  cobalt-wash: '#E8EEF7'
+  focus-on-light: '#355F9C'
   focus-on-rail: '#93C5FD'
-  border-subtle: '#E3DED4'
-  border-default: '#CBC4B7'
-  border-strong: '#8F877B'
-  success: '#246B45'
+  border-subtle: '#D8DEE6'
+  border-default: '#BEC7D2'
+  border-strong: '#7B8794'
+  success: '#2F6B55'
   success-wash: '#E8F2EC'
-  warning: '#8A570F'
+  warning: '#946A26'
   warning-wash: '#F8EDD8'
   error: '#A73535'
   error-wash: '#F8E7E5'
-  info: '#315F88'
+  info: '#355F9C'
   info-wash: '#E7EFF5'
 typography:
   page-title:
@@ -147,13 +147,13 @@ LeaseFlow의 시각 명제는 **Quiet Evidence Ledger / 조용한 증거 대장*
 
 색은 역할이 하나씩만 있다.
 
-- `{colors.canvas}`는 따뜻한 종이색 작업 바탕이다. 긴 검토에서 흰색 눈부심을 줄이되 질감 이미지나 노이즈를 넣지 않는다.
+- `{colors.canvas}`는 차가운 중립 회색 작업 바탕이다. 표면과 구분선을 또렷하게 나누되 질감 이미지나 노이즈를 넣지 않는다.
 - `{colors.rail}`은 전역 탐색 전용 잉크 레일이다. 본문이나 모달을 어둡게 만드는 다크 테마로 확장하지 않는다.
 - `{colors.cobalt}`는 현재 선택, 링크, 포커스, 현재 단계의 유일한 주 행동에만 사용한다. 넓은 장식 면이나 KPI 강조색으로 사용하지 않는다.
 - `{colors.success}`, `{colors.warning}`, `{colors.error}`, `{colors.info}`는 의미 상태에만 사용한다. 모든 상태에는 텍스트 또는 아이콘 라벨을 함께 둔다.
 - 중립 계층은 `{colors.border-subtle}` → `{colors.border-default}` → `{colors.border-strong}`과 `{colors.surface-subtle}` → `{colors.surface}`의 조합으로 만든다.
 
-검증 기준: 흰 글자와 `{colors.cobalt}`는 6.35:1, `{colors.focus-on-rail}`과 `{colors.rail}`은 8.12:1, `{colors.rail-text}`와 `{colors.rail}`은 13.33:1이다. 포커스 표시와 비텍스트 경계는 인접색 대비 3:1 이상이어야 한다.
+검증 기준: 흰 글자와 `{colors.cobalt}`는 6.43:1, `{colors.focus-on-rail}`과 `{colors.rail}`은 9.14:1, `{colors.rail-text}`와 `{colors.rail}`은 15.08:1이다. 포커스 표시와 비텍스트 경계는 인접색 대비 3:1 이상이어야 한다.
 
 금지: 그라디언트, 글래스 블러, 네온, 보라색 AI 팔레트, 부동산 관습형 청록색, 장식용 상태색, 대형 색면 KPI.
 
@@ -257,7 +257,7 @@ CSS만 사용하며 JavaScript 모션 의존성을 추가하지 않는다.
 | Do | Don't |
 | --- | --- |
 | 대기열 → 근거/비교 → 결정 레일의 일정한 작업 문법 | 히어로 → KPI 카드 → 중첩 카드의 대시보드 문법 |
-| 따뜻한 종이 바탕 + 잉크 레일 + 단일 코발트 | 그라디언트, 글래스, 보라색·청록색 장식 팔레트 |
+| 차가운 중립 바탕 + 잉크 레일 + 단일 코발트 | 그라디언트, 글래스, 보라색·청록색 장식 팔레트 |
 | Pretendard Variable 단일 계열 | Georgia, Cinzel, Josefin, 장식 serif |
 | 실제 파일 또는 명시적 “미리보기 없음” | CSS로 그린 가짜 평면도·스태킹 플랜 |
 | 표/목록 + 선택 상세 | 원자료 카드 벽, 모든 항목의 독립 surface |

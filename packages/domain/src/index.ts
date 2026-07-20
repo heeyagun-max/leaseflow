@@ -29,8 +29,33 @@ export type AssetLifecycleStatus = "registered" | "steward_confirmed" | "publish
 export type AssetClassificationState = "candidate" | "confirmed" | "manual_review";
 export type AssetExtractionState = "not_started" | "candidate_ready" | "unsupported" | "reviewed";
 
+export const SOURCE_DOCUMENT_TYPES = [
+  "monthly_owner_update",
+  "floor_plan",
+  "leasing_flyer",
+  "area_workbook",
+  "legal_document",
+] as const;
+
+export type SourceDocumentType = (typeof SOURCE_DOCUMENT_TYPES)[number];
+
+export const SOURCE_DOCUMENT_FORMATS = [
+  "json",
+  "pdf",
+  "xlsx",
+  "docx",
+  "svg",
+  "dwg",
+  "dxf",
+  "other",
+] as const;
+
+export type SourceDocumentFormat = (typeof SOURCE_DOCUMENT_FORMATS)[number];
+export type SourceDocumentOrigin = "synthetic_seed" | "ephemeral_private_qa";
+export type DocumentReviewPolicy = "publishable_reference" | "review_only" | "manual_review";
+
 export interface AssetAuditProvenance {
-  event: "registered" | "filename_observed" | "classified" | "steward_confirmed" | "published" | "superseded";
+  event: "registered" | "filename_observed" | "classified" | "steward_confirmed" | "reviewed" | "published" | "superseded";
   actor_id: string;
   occurred_at: string;
   details: Record<string, unknown>;
@@ -39,7 +64,8 @@ export interface AssetAuditProvenance {
 export interface GovernedSourceAsset {
   id: string;
   observed_filenames: string[];
-  synthetic_fingerprint: string;
+  synthetic_fingerprint: string | null;
+  content_fingerprint: string;
   mime_type: string;
   extension: string;
   byte_size: number;
@@ -47,6 +73,11 @@ export interface GovernedSourceAsset {
   building_alias_candidate: string | null;
   source_organization: string;
   document_category: AssetDocumentCategory;
+  document_type: SourceDocumentType;
+  source_format: SourceDocumentFormat;
+  source_origin: SourceDocumentOrigin;
+  review_policy: DocumentReviewPolicy;
+  reviewed_summary: string | null;
   artifact_date: string | null;
   effective_date: string | null;
   confidentiality: AssetConfidentiality;
@@ -83,9 +114,50 @@ export interface RegisterSourceAssetInput {
   source_organization: string;
   linked_file_version_id?: string | null;
   occurred_at: string;
+  document_type?: SourceDocumentType;
+  source_format?: SourceDocumentFormat;
+  content_fingerprint?: string;
+  source_origin?: SourceDocumentOrigin;
+  review_policy?: DocumentReviewPolicy;
+  reviewed_summary?: null;
+  has_extractable_text?: boolean;
+}
+
+export interface RegisterDocumentAssetInput {
+  id?: string;
+  document_id?: string;
+  observed_filename: string;
+  content_fingerprint: string;
+  synthetic_fingerprint?: string | null;
+  mime_type: string;
+  byte_size: number;
+  building_alias_candidate: string | null;
+  building_id: string | null;
+  source_organization: string;
+  document_type: SourceDocumentType;
+  source_format: SourceDocumentFormat;
+  source_origin: SourceDocumentOrigin;
+  linked_file_version_id?: string | null;
+  has_extractable_text?: boolean;
+  review_policy?: DocumentReviewPolicy;
+  reviewed_summary?: null;
+  actor?: { id: string; role: UserRole };
+  occurred_at: string;
+}
+
+export interface PublishedDocumentReference {
+  building_id: string;
+  document_type: SourceDocumentType;
+  reviewed_summary: string;
 }
 
 const restrictedAssetCategories = new Set<AssetDocumentCategory>(["area_workbook", "legal_document"]);
+const forbiddenPersistedDocumentInputKeys = new Set([
+  "raw_bytes",
+  "raw_text",
+  "normalized_text",
+  "private_asset_path",
+]);
 
 function filenameArtifactDate(filename: string): string | null {
   const compact = filename.match(/(?:^|[^0-9])(20\d{2})[-_.]?(0[1-9]|1[0-2])[-_.]?([0-2]\d|3[01])(?:[^0-9]|$)/);
@@ -126,16 +198,99 @@ function classifyAssetFilename(filename: string): {
   return { category: "building_flyer", confidentiality: "public_candidate", versionFamily: `building-flyer:${flyerFamily}`, segmentationMarker: "single-building" };
 }
 
-export function registerSourceAsset(
-  registry: GovernedAssetRegistry,
-  input: RegisterSourceAssetInput,
-): GovernedAssetRegistry {
-  if (!input.synthetic_fingerprint.startsWith("synthetic:")) {
-    throw new Error("Only synthetic asset fingerprints are accepted in demo mode.");
+function sourceFormatFromFilename(filename: string): SourceDocumentFormat {
+  const extension = filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
+  return (SOURCE_DOCUMENT_FORMATS as readonly string[]).includes(extension)
+    ? extension as SourceDocumentFormat
+    : "other";
+}
+
+function documentTypeFromClassification(
+  filename: string,
+  category: AssetDocumentCategory,
+): SourceDocumentType {
+  if (/monthly[^a-z0-9]*owner|owner[^a-z0-9]*update|월간.*임대/i.test(filename)) return "monthly_owner_update";
+  if (category === "floor_plan") return "floor_plan";
+  if (category === "area_workbook") return "area_workbook";
+  if (category === "legal_document") return "legal_document";
+  return "leasing_flyer";
+}
+
+function categoryForDocumentType(
+  documentType: SourceDocumentType,
+  classifiedCategory: AssetDocumentCategory,
+): AssetDocumentCategory {
+  if (documentType === "floor_plan") return "floor_plan";
+  if (documentType === "area_workbook") return "area_workbook";
+  if (documentType === "legal_document") return "legal_document";
+  if (documentType === "leasing_flyer"
+    && (classifiedCategory === "portfolio_flyer" || classifiedCategory === "perspective_render")) {
+    return classifiedCategory;
   }
-  if (input.byte_size < 0 || !Number.isSafeInteger(input.byte_size)) throw new Error("Asset byte size must be a non-negative integer.");
-  const existing = registry.assets.find((asset) => asset.synthetic_fingerprint === input.synthetic_fingerprint);
+  return "building_flyer";
+}
+
+function confidentialityForCategory(category: AssetDocumentCategory): AssetConfidentiality {
+  if (category === "legal_document") return "legal_restricted";
+  if (category === "area_workbook") return "restricted";
+  return "public_candidate";
+}
+
+export function resolveDocumentReviewPolicy(input: {
+  document_type: SourceDocumentType;
+  source_format: SourceDocumentFormat;
+  has_extractable_text?: boolean;
+}): DocumentReviewPolicy {
+  if (input.source_format === "dwg" || input.source_format === "dxf" || input.has_extractable_text === false) {
+    return "manual_review";
+  }
+  if (input.document_type === "legal_document" || input.document_type === "area_workbook") return "review_only";
+  return "publishable_reference";
+}
+
+function requireDocumentId(input: { id?: string; document_id?: string }): string {
+  const ids = [input.id, input.document_id].filter((value): value is string => typeof value === "string" && value.length > 0);
+  if (ids.length !== 1) throw new Error("Document registration requires exactly one document id.");
+  return ids[0]!;
+}
+
+function requireContentFingerprint(value: string): string {
+  if (!/^(?:sha256|synthetic):[^\s]+$/.test(value)) {
+    throw new Error("Document content fingerprint must use a sha256: or synthetic: prefix.");
+  }
+  return value;
+}
+
+function assertNoRawDocumentContent(input: object): void {
+  for (const key of Object.keys(input)) {
+    if (forbiddenPersistedDocumentInputKeys.has(key)) {
+      throw new Error(`Document registration cannot persist ${key}.`);
+    }
+  }
+}
+
+export function registerDocumentAsset(
+  registry: GovernedAssetRegistry,
+  input: RegisterDocumentAssetInput,
+): GovernedAssetRegistry {
+  assertNoRawDocumentContent(input);
+  if (input.actor) requireAction(input.actor.role, "source.upload");
+  if (input.byte_size < 0 || !Number.isSafeInteger(input.byte_size)) {
+    throw new Error("Asset byte size must be a non-negative integer.");
+  }
+  if (input.reviewed_summary !== undefined && input.reviewed_summary !== null) {
+    throw new Error("A reviewed summary can only be accepted by the review action.");
+  }
+
+  const id = requireDocumentId(input);
+  const contentFingerprint = requireContentFingerprint(input.content_fingerprint);
+  const existing = registry.assets.find((asset) => asset.content_fingerprint === contentFingerprint);
   if (existing) {
+    if (existing.building_id !== input.building_id
+      || existing.document_type !== input.document_type
+      || existing.source_organization !== input.source_organization) {
+      throw new Error("Matching document content is already registered with different building or governance metadata.");
+    }
     const observed = existing.observed_filenames.includes(input.observed_filename)
       ? existing.observed_filenames
       : [...existing.observed_filenames, input.observed_filename];
@@ -145,57 +300,120 @@ export function registerSourceAsset(
         observed_filenames: observed,
         audit_provenance: observed === existing.observed_filenames ? asset.audit_provenance : [...asset.audit_provenance, {
           event: "filename_observed",
-          actor_id: "system",
+          actor_id: input.actor?.id ?? "system",
           occurred_at: input.occurred_at,
           details: { observed_filename: input.observed_filename },
         }],
       } : asset),
     };
   }
+  if (registry.assets.some((asset) => asset.id === id)) throw new Error(`Duplicate source asset id: ${id}.`);
 
   const extension = input.observed_filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
   const classification = classifyAssetFilename(input.observed_filename);
-  const unsupportedCad = extension === "dwg" || extension === "dxf";
+  const documentCategory = categoryForDocumentType(input.document_type, classification.category);
+  const resolvedReviewPolicy = resolveDocumentReviewPolicy(input);
+  const reviewPolicy = input.review_policy === "manual_review"
+    ? "manual_review"
+    : input.document_type === "floor_plan" && input.review_policy === "review_only"
+      ? "review_only"
+      : resolvedReviewPolicy;
+  if (input.review_policy !== undefined && input.review_policy !== reviewPolicy) {
+    throw new Error(`Document review policy must be ${reviewPolicy}.`);
+  }
+  const manualReview = reviewPolicy === "manual_review";
   const asset: GovernedSourceAsset = {
-    id: input.id,
+    id,
     observed_filenames: [input.observed_filename],
-    synthetic_fingerprint: input.synthetic_fingerprint,
+    synthetic_fingerprint: input.synthetic_fingerprint ?? null,
+    content_fingerprint: contentFingerprint,
     mime_type: input.mime_type,
     extension,
     byte_size: input.byte_size,
     building_id: input.building_id,
     building_alias_candidate: input.building_alias_candidate,
     source_organization: input.source_organization,
-    document_category: classification.category,
+    document_category: documentCategory,
+    document_type: input.document_type,
+    source_format: input.source_format,
+    source_origin: input.source_origin,
+    review_policy: reviewPolicy,
+    reviewed_summary: null,
     artifact_date: filenameArtifactDate(input.observed_filename),
     effective_date: null,
-    confidentiality: classification.confidentiality,
+    confidentiality: confidentialityForCategory(documentCategory),
     externally_shareable: false,
     status: "registered",
-    classification_state: unsupportedCad ? "manual_review" : "candidate",
+    classification_state: manualReview ? "manual_review" : "candidate",
     version_family: classification.versionFamily,
     segmentation_marker: classification.segmentationMarker,
     linked_file_version_id: input.linked_file_version_id ?? null,
     duplicate_of: null,
     supersedes: null,
-    extraction_method: unsupportedCad ? "manual" : "deterministic_metadata",
-    extraction_state: unsupportedCad ? "unsupported" : "candidate_ready",
+    extraction_method: manualReview ? "manual" : "deterministic_metadata",
+    extraction_state: manualReview ? "unsupported" : "candidate_ready",
     review_decision: "pending",
     reviewed_by: null,
     reviewed_at: null,
     active: false,
     authorized: false,
     audit_provenance: [
-      { event: "registered", actor_id: "system", occurred_at: input.occurred_at, details: { source_organization: input.source_organization } },
-      { event: "classified", actor_id: "system", occurred_at: input.occurred_at, details: { candidate_only: true } },
+      {
+        event: "registered",
+        actor_id: input.actor?.id ?? "system",
+        occurred_at: input.occurred_at,
+        details: { source_organization: input.source_organization, source_origin: input.source_origin },
+      },
+      {
+        event: "classified",
+        actor_id: "system",
+        occurred_at: input.occurred_at,
+        details: { candidate_only: true, review_policy: reviewPolicy },
+      },
     ],
   };
   return { assets: [...registry.assets, asset] };
 }
 
+export function registerSourceAsset(
+  registry: GovernedAssetRegistry,
+  input: RegisterSourceAssetInput,
+): GovernedAssetRegistry {
+  if (!input.synthetic_fingerprint.startsWith("synthetic:")) {
+    throw new Error("Only synthetic asset fingerprints are accepted in demo mode.");
+  }
+  const classification = classifyAssetFilename(input.observed_filename);
+  return registerDocumentAsset(registry, {
+    id: input.id,
+    observed_filename: input.observed_filename,
+    content_fingerprint: input.content_fingerprint ?? input.synthetic_fingerprint,
+    synthetic_fingerprint: input.synthetic_fingerprint,
+    mime_type: input.mime_type,
+    byte_size: input.byte_size,
+    building_alias_candidate: input.building_alias_candidate,
+    building_id: input.building_id,
+    source_organization: input.source_organization,
+    occurred_at: input.occurred_at,
+    document_type: input.document_type ?? documentTypeFromClassification(input.observed_filename, classification.category),
+    source_format: input.source_format ?? sourceFormatFromFilename(input.observed_filename),
+    source_origin: input.source_origin ?? "synthetic_seed",
+    ...(input.linked_file_version_id !== undefined ? { linked_file_version_id: input.linked_file_version_id } : {}),
+    ...(input.review_policy !== undefined ? { review_policy: input.review_policy } : {}),
+    ...(input.reviewed_summary !== undefined ? { reviewed_summary: input.reviewed_summary } : {}),
+    ...(input.has_extractable_text !== undefined ? { has_extractable_text: input.has_extractable_text } : {}),
+  });
+}
+
 export function confirmSourceAsset(
   registry: GovernedAssetRegistry,
-  input: { asset_id: string; building_id: string; externally_shareable: boolean; actor: { id: string; role: UserRole }; occurred_at: string },
+  input: {
+    asset_id: string;
+    building_id: string;
+    externally_shareable: boolean;
+    reviewed_summary?: string | null;
+    actor: { id: string; role: UserRole };
+    occurred_at: string;
+  },
 ): GovernedAssetRegistry {
   requireAction(input.actor.role, "candidate.confirm");
   const target = registry.assets.find((asset) => asset.id === input.asset_id);
@@ -208,6 +426,7 @@ export function confirmSourceAsset(
   if (input.externally_shareable && restrictedAssetCategories.has(target.document_category)) {
     throw new Error("Restricted legal or workbook sources cannot be made externally shareable by classification.");
   }
+  const reviewedSummary = input.reviewed_summary == null ? null : normalizeReviewedSummary(input.reviewed_summary);
   return {
     assets: registry.assets.map((asset) => asset.id === target.id ? {
       ...asset,
@@ -216,6 +435,7 @@ export function confirmSourceAsset(
       classification_state: "confirmed",
       extraction_state: "reviewed",
       review_decision: "confirmed",
+      reviewed_summary: reviewedSummary,
       reviewed_by: input.actor.id,
       reviewed_at: input.occurred_at,
       authorized: true,
@@ -224,6 +444,66 @@ export function confirmSourceAsset(
         actor_id: input.actor.id,
         occurred_at: input.occurred_at,
         details: { building_id: input.building_id, externally_shareable: input.externally_shareable },
+      }],
+    } : asset),
+  };
+}
+
+function normalizeReviewedSummary(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) throw new Error("Document review requires a reviewed summary.");
+  if (normalized.length > 2_000) throw new Error("Document reviewed summary exceeds 2000 characters.");
+  return normalized;
+}
+
+function targetDocumentId(input: { asset_id?: string; document_id?: string }): string {
+  const ids = [input.asset_id, input.document_id]
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+  if (ids.length !== 1) throw new Error("Document action requires exactly one document id.");
+  return ids[0]!;
+}
+
+export function reviewDocumentAsset(
+  registry: GovernedAssetRegistry,
+  input: {
+    asset_id?: string;
+    document_id?: string;
+    reviewed_summary: string;
+    externally_shareable?: boolean;
+    actor: { id: string; role: UserRole };
+    occurred_at: string;
+  },
+): GovernedAssetRegistry {
+  requireAction(input.actor.role, "candidate.confirm");
+  const documentId = targetDocumentId(input);
+  const target = registry.assets.find((asset) => asset.id === documentId);
+  if (!target) throw new Error(`Unknown source asset: ${documentId}.`);
+  if (target.status !== "registered") throw new Error("Only registered document candidates can be reviewed.");
+  if (!target.building_id || !target.building_alias_candidate) {
+    throw new Error("Unresolved building alias blocks document review.");
+  }
+  const externallyShareable = input.externally_shareable ?? target.review_policy === "publishable_reference";
+  if (externallyShareable && target.review_policy !== "publishable_reference") {
+    throw new Error("Review-only or manual-review documents cannot be externally shareable.");
+  }
+  const reviewedSummary = normalizeReviewedSummary(input.reviewed_summary);
+  return {
+    assets: registry.assets.map((asset) => asset.id === target.id ? {
+      ...asset,
+      externally_shareable: externallyShareable,
+      status: "steward_confirmed",
+      classification_state: "confirmed",
+      extraction_state: "reviewed",
+      review_decision: "confirmed",
+      reviewed_summary: reviewedSummary,
+      reviewed_by: input.actor.id,
+      reviewed_at: input.occurred_at,
+      authorized: true,
+      audit_provenance: [...asset.audit_provenance, {
+        event: "reviewed",
+        actor_id: input.actor.id,
+        occurred_at: input.occurred_at,
+        details: { externally_shareable: externallyShareable },
       }],
     } : asset),
   };
@@ -246,6 +526,12 @@ export function publishSourceAsset(
   }
   if (!target.building_id || !target.building_alias_candidate) throw new Error("Unresolved building alias blocks publication.");
   if (target.extraction_state === "unsupported") throw new Error("Unsupported CAD extraction blocks publication.");
+  if (target.review_policy !== "publishable_reference") {
+    throw new Error("Review-only or manual-review documents cannot be published externally.");
+  }
+  if (target.document_type !== "floor_plan" && !target.reviewed_summary) {
+    throw new Error("Document publication requires a reviewed summary.");
+  }
   if (target.document_category === "floor_plan"
     && (!target.linked_file_version_id
       || input.current_linked_file_versions?.get(target.linked_file_version_id) !== target.building_id)) {
@@ -290,6 +576,26 @@ export function publishSourceAsset(
   };
 }
 
+export function publishDocumentAsset(
+  registry: GovernedAssetRegistry,
+  input: {
+    asset_id?: string;
+    document_id?: string;
+    actor: { id: string; role: UserRole };
+    occurred_at: string;
+    current_linked_file_versions?: ReadonlyMap<string, string>;
+  },
+): GovernedAssetRegistry {
+  return publishSourceAsset(registry, {
+    asset_id: targetDocumentId(input),
+    actor: input.actor,
+    occurred_at: input.occurred_at,
+    ...(input.current_linked_file_versions
+      ? { current_linked_file_versions: input.current_linked_file_versions }
+      : {}),
+  });
+}
+
 export function isDerivedCurrentAsset(
   asset: GovernedSourceAsset,
   assets: readonly GovernedSourceAsset[],
@@ -317,6 +623,37 @@ export function selectExternallyVisibleAssets(
     && asset.authorized
     && asset.externally_shareable,
   );
+}
+
+export function selectPublishedDocumentReferences(
+  assets: readonly GovernedSourceAsset[],
+  authorizedBuildingIds: readonly string[],
+): PublishedDocumentReference[] {
+  const allowedBuildings = new Set(authorizedBuildingIds);
+  const eligible = assets.filter((asset) =>
+    asset.status === "published"
+    && asset.active
+    && asset.building_id !== null
+    && allowedBuildings.has(asset.building_id)
+    && isDerivedCurrentAsset(asset, assets)
+    && asset.authorized
+    && asset.externally_shareable
+    && asset.review_policy === "publishable_reference"
+    && !restrictedAssetCategories.has(asset.document_category)
+    && typeof asset.reviewed_summary === "string"
+    && asset.reviewed_summary.trim().length > 0,
+  );
+  const families = new Set<string>();
+  return eligible.map((asset) => {
+    const family = `${asset.building_id}:${asset.version_family}`;
+    if (families.has(family)) throw new Error(`Multiple current published documents exist for ${family}.`);
+    families.add(family);
+    return {
+      building_id: asset.building_id!,
+      document_type: asset.document_type,
+      reviewed_summary: asset.reviewed_summary!,
+    };
+  });
 }
 
 export interface VersionedRecord {

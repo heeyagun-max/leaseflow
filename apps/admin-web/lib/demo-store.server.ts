@@ -20,15 +20,21 @@ import {
   proposePackageEdit,
   proposeWeeklyReportPatch,
   publishConfirmedBatch,
+  publishDocumentAsset as publishGovernedDocumentAsset,
   publishSourceAsset,
+  registerDocumentAsset as registerGovernedDocumentAsset,
   recordExtraction,
+  reviewDocumentAsset as reviewGovernedDocumentAsset,
   sendWeeklyReport,
   sendOperationalPackage,
   type CreateWeeklyReportDraftInput,
+  type GovernedAssetRegistry,
   type OperationalState,
   type OperationalRequestExtraction,
   type UserRole,
+  type RegisterDocumentAssetInput,
   type WeeklyReportPatchCandidate,
+  type WeeklyReportSections,
   type WeeklyReportState,
 } from "@leaseflow/domain";
 import {
@@ -37,12 +43,17 @@ import {
   currentDemoMaterialVersionIds,
   demoUsers,
   mapSourceCandidatesToDomain,
+  migrateGovernedAssetRegistryToDocumentLifecycle,
   migrateDemoStateToV3,
   type DemoState,
   type LegacyDemoStateV2,
 } from "@leaseflow/demo-data";
 import { z } from "zod/v3";
 import { loadCanonicalWeeklyReportDraft } from "./mock-outlook.server";
+import {
+  loadWeeklyReportAuthorities,
+  type ConfiguredWeeklyReportAuthority,
+} from "./weekly-settings.server";
 
 export class RevisionConflictError extends Error {
   constructor(readonly expected: number, readonly actual: number) {
@@ -60,6 +71,24 @@ export class WeeklyReportStaleError extends Error {
   constructor(readonly currentRevision: number) {
     super(`Weekly report inputs became stale; reload revision ${currentRevision} before continuing.`);
   }
+}
+
+export class WorkflowAccessError extends Error {}
+
+export function applyConfiguredWeeklyReportSections(
+  sections: WeeklyReportSections,
+  requiredSectionKeys: ConfiguredWeeklyReportAuthority["automation"]["required_section_keys"],
+): WeeklyReportSections {
+  const included = new Set<keyof WeeklyReportSections>(requiredSectionKeys);
+  return {
+    key_issue: included.has("key_issue") ? sections.key_issue : "",
+    changes_since_last_report: included.has("changes_since_last_report") ? [...sections.changes_since_last_report] : [],
+    activity_summary: included.has("activity_summary") ? [...sections.activity_summary] : [],
+    negotiated_area_floor_changes: included.has("negotiated_area_floor_changes") ? [...sections.negotiated_area_floor_changes] : [],
+    competitor_buildings: included.has("competitor_buildings") ? [...sections.competitor_buildings] : [],
+    blocker_and_pending_approval: included.has("blocker_and_pending_approval") ? [...sections.blocker_and_pending_approval] : [],
+    next_actions: included.has("next_actions") ? sections.next_actions.map((item) => ({ ...item })) : [],
+  };
 }
 
 function defaultStorePath(): string {
@@ -81,20 +110,9 @@ const recipientConfigSchema = z.object({
 export interface DemoRuntimeConfiguration {
   access: z.infer<typeof buildingAccessConfigSchema>;
   recipients: z.infer<typeof recipientConfigSchema>;
+  reportAuthorities?: ConfiguredWeeklyReportAuthority[];
   reportRecipients?: ConfiguredReportRecipientGroup;
 }
-
-const reportRecipientSchema = z.object({
-  configuration_id: z.string().min(1),
-  building_id: z.string().min(1),
-  to: z.array(z.object({
-    name: z.string().min(1).optional(), email: z.string().email(), role: z.literal("to_landlord_practical"),
-  }).strict()).length(1),
-  cc: z.array(z.object({
-    name: z.string().min(1).optional(), email: z.string().email(),
-    role: z.enum(["cc_landlord_team", "cc_landlord_exec", "cc_lm_team", "cc_lm_exec"]),
-  }).strict()).length(4),
-}).strict();
 
 export interface ConfiguredReportRecipientGroup {
   configuration_id: string;
@@ -105,21 +123,22 @@ export interface ConfiguredReportRecipientGroup {
 
 export async function loadDemoRuntimeConfiguration(): Promise<DemoRuntimeConfiguration> {
   const dataDirectory = path.dirname(path.dirname(defaultStorePath()));
-  const [accessRaw, recipientsRaw, reportRecipientsRaw] = await Promise.all([
+  const [accessRaw, recipientsRaw, reportAuthorities] = await Promise.all([
     readFile(path.join(dataDirectory, "building_access.json"), "utf8"),
     readFile(path.join(dataDirectory, "broker_package_recipient_group.json"), "utf8"),
-    readFile(path.join(dataDirectory, "recipient_group.json"), "utf8"),
+    loadWeeklyReportAuthorities(),
   ]);
-  const reportRecipients = reportRecipientSchema.parse(JSON.parse(reportRecipientsRaw));
+  const primaryReportAuthority = reportAuthorities.find((authority) => authority.building_id === "bld-cobalt");
   return {
     access: buildingAccessConfigSchema.parse(JSON.parse(accessRaw)),
     recipients: recipientConfigSchema.parse(JSON.parse(recipientsRaw)),
-    reportRecipients: {
-      configuration_id: reportRecipients.configuration_id,
-      building_id: reportRecipients.building_id,
-      to: reportRecipients.to.map(({ email, role }) => ({ email, role })),
-      cc: reportRecipients.cc.map(({ email, role }) => ({ email, role })),
-    },
+    reportAuthorities,
+    ...(primaryReportAuthority ? { reportRecipients: {
+      configuration_id: primaryReportAuthority.configuration_id,
+      building_id: primaryReportAuthority.building_id,
+      to: primaryReportAuthority.recipients.to.map(({ email, role }) => ({ email, role })),
+      cc: primaryReportAuthority.recipients.cc.map(({ email, role }) => ({ email, role })),
+    } } : {}),
   };
 }
 const publicationStatusSchema = z.enum([
@@ -315,15 +334,22 @@ const operationalStateSchema = z.object({
   reports: weeklyReportStateSchema,
 }).strict();
 const assetAuditProvenanceSchema = z.object({
-  event: z.enum(["registered", "filename_observed", "classified", "steward_confirmed", "published", "superseded"]),
+  event: z.enum(["registered", "filename_observed", "classified", "steward_confirmed", "reviewed", "published", "superseded"]),
   actor_id: z.string().min(1), occurred_at: z.string().datetime(), details: z.record(z.unknown()),
 }).strict();
 const sourceAssetSchema = z.object({
   id: z.string().min(1), observed_filenames: z.array(z.string().min(1)).min(1),
-  synthetic_fingerprint: z.string().startsWith("synthetic:"), mime_type: z.string().min(1), extension: z.string(),
+  synthetic_fingerprint: z.string().startsWith("synthetic:").nullable(),
+  content_fingerprint: z.string().regex(/^(?:sha256|synthetic):[^\s]+$/),
+  mime_type: z.string().min(1), extension: z.string(),
   byte_size: z.number().int().nonnegative(), building_id: z.string().min(1).nullable(),
   building_alias_candidate: z.string().min(1).nullable(), source_organization: z.string().min(1),
   document_category: z.enum(["perspective_render", "building_flyer", "portfolio_flyer", "floor_plan", "area_workbook", "legal_document"]),
+  document_type: z.enum(["monthly_owner_update", "floor_plan", "leasing_flyer", "area_workbook", "legal_document"]),
+  source_format: z.enum(["json", "pdf", "xlsx", "docx", "svg", "dwg", "dxf", "other"]),
+  source_origin: z.enum(["synthetic_seed", "ephemeral_private_qa"]),
+  review_policy: z.enum(["publishable_reference", "review_only", "manual_review"]),
+  reviewed_summary: z.string().min(1).max(2_000).nullable(),
   artifact_date: dateSchema.nullable(), effective_date: dateSchema.nullable(),
   confidentiality: z.enum(["internal", "restricted", "legal_restricted", "public_candidate"]),
   externally_shareable: z.boolean(), status: z.enum(["registered", "steward_confirmed", "published", "superseded", "duplicate", "rejected"]),
@@ -354,7 +380,30 @@ const persistedDemoStateSchema = z.object({
   operations: operationalStateSchema,
 }).strict();
 
+const canonicalDocumentAssetKeys = [
+  "content_fingerprint",
+  "document_type",
+  "source_format",
+  "source_origin",
+  "review_policy",
+  "reviewed_summary",
+] as const;
+
+function hasPersistedDocumentLifecycleFields(asset: Record<string, unknown>): boolean {
+  return canonicalDocumentAssetKeys.every((key) => key in asset);
+}
+
 export type DemoRuntimeState = DemoState;
+
+export type RegisterDocumentAssetStoreInput = Omit<
+  RegisterDocumentAssetInput,
+  "actor" | "occurred_at"
+> & {
+  actor_id: string;
+  expected_revision: number;
+  candidate_summary?: string | null;
+  occurred_at?: string;
+};
 
 function assertOperationalStateInvariants(state: DemoRuntimeState): void {
   const unique = (values: readonly string[], label: string) => {
@@ -390,7 +439,7 @@ function assertOperationalStateInvariants(state: DemoRuntimeState): void {
 
 function assertAssetRegistryInvariants(state: DemoRuntimeState): void {
   const ids = state.asset_registry.assets.map((asset) => asset.id);
-  const fingerprints = state.asset_registry.assets.map((asset) => asset.synthetic_fingerprint);
+  const fingerprints = state.asset_registry.assets.map((asset) => asset.content_fingerprint);
   if (new Set(ids).size !== ids.length) throw new Error("duplicate governed source asset id");
   if (new Set(fingerprints).size !== fingerprints.length) throw new Error("exact fingerprint must resolve to one governed source asset");
   const fileIds = new Set(state.files.map((file) => file.id));
@@ -404,17 +453,24 @@ function assertAssetRegistryInvariants(state: DemoRuntimeState): void {
 function migratePersistedState(value: unknown): unknown {
   const candidate = value as { schema_version?: unknown; operations?: unknown };
   if (candidate?.schema_version === 1) {
-    return {
+    return migrateDemoStateToV3({
       ...(value as Record<string, unknown>),
-      schema_version: 3,
+      schema_version: 2,
       operations: { requests: [], packages: [], activities: [], audit: [], reports: createInitialWeeklyReportState() },
-    };
+    } as unknown as LegacyDemoStateV2);
   }
   if (candidate?.schema_version === 2) {
     return migrateDemoStateToV3(value as LegacyDemoStateV2);
   }
   if (candidate?.schema_version === 3 && !("asset_registry" in (value as Record<string, unknown>))) {
     return migrateDemoStateToV3(value as LegacyDemoStateV2);
+  }
+  if (candidate?.schema_version === 3) {
+    const current = value as DemoRuntimeState;
+    return {
+      ...current,
+      asset_registry: migrateGovernedAssetRegistryToDocumentLifecycle(current.asset_registry),
+    };
   }
   return value;
 }
@@ -461,12 +517,12 @@ async function withPathLock<T>(storePath: string, operation: () => Promise<T>): 
 export class DemoFileStore {
   readonly storePath: string;
   private readonly configLoader: () => Promise<DemoRuntimeConfiguration>;
-  private readonly reportDraftLoader: () => Promise<CreateWeeklyReportDraftInput>;
+  private readonly reportDraftLoader: (buildingId: string) => Promise<CreateWeeklyReportDraftInput>;
 
   constructor(
     storePath = process.env.LEASEFLOW_DEMO_STATE_PATH ?? defaultStorePath(),
     configLoader: () => Promise<DemoRuntimeConfiguration> = loadDemoRuntimeConfiguration,
-    reportDraftLoader: () => Promise<CreateWeeklyReportDraftInput> = loadCanonicalWeeklyReportDraft,
+    reportDraftLoader: (buildingId: string) => Promise<CreateWeeklyReportDraftInput> = loadCanonicalWeeklyReportDraft,
   ) {
     this.storePath = path.resolve(storePath);
     this.configLoader = configLoader;
@@ -475,6 +531,25 @@ export class DemoFileStore {
 
   async getState(): Promise<DemoRuntimeState> {
     return withPathLock(this.storePath, () => this.readOrInitialize());
+  }
+
+  getCanonicalWeeklyReportDraft(buildingId: string): Promise<CreateWeeklyReportDraftInput> {
+    return this.reportDraftLoader(buildingId);
+  }
+
+  async snapshotForDemoReset(input: { actor_id: string; expected_revision: number }): Promise<DemoRuntimeState> {
+    return withPathLock(this.storePath, async () => {
+      this.resolveActor(input.actor_id);
+      const current = await this.readOrInitialize();
+      this.requireRevision(current, input.expected_revision);
+      return structuredClone(current);
+    });
+  }
+
+  async restoreAfterFailedDemoReset(snapshot: DemoRuntimeState): Promise<void> {
+    return withPathLock(this.storePath, async () => {
+      await this.writeState(structuredClone(snapshot));
+    });
   }
 
   async reset(input: { actor_id: string; expected_revision: number; occurred_at?: string }): Promise<DemoRuntimeState> {
@@ -563,6 +638,70 @@ export class DemoFileStore {
           .map((file) => [file.id, file.building_id])),
       }),
     }));
+  }
+
+  async registerDocumentAsset(input: RegisterDocumentAssetStoreInput): Promise<DemoState> {
+    const {
+      actor_id: actorId,
+      expected_revision: expectedRevision,
+      candidate_summary: candidateSummary,
+      occurred_at: occurredAt,
+      ...document
+    } = input;
+    void candidateSummary;
+    return this.mutateDocument(expectedRevision, (state) => registerGovernedDocumentAsset(
+      state.asset_registry,
+      {
+        ...document,
+        actor: this.resolveActor(actorId),
+        occurred_at: occurredAt ?? new Date().toISOString(),
+      },
+    ));
+  }
+
+  async reviewDocumentAsset(input: {
+    actor_id: string;
+    expected_revision: number;
+    asset_id?: string;
+    document_id?: string;
+    reviewed_summary: string;
+    externally_shareable?: boolean;
+    occurred_at?: string;
+  }): Promise<DemoState> {
+    return this.mutateDocument(input.expected_revision, (state) => reviewGovernedDocumentAsset(
+      state.asset_registry,
+      {
+        ...(input.asset_id ? { asset_id: input.asset_id } : {}),
+        ...(input.document_id ? { document_id: input.document_id } : {}),
+        reviewed_summary: input.reviewed_summary,
+        ...(input.externally_shareable !== undefined
+          ? { externally_shareable: input.externally_shareable }
+          : {}),
+        actor: this.resolveActor(input.actor_id),
+        occurred_at: input.occurred_at ?? new Date().toISOString(),
+      },
+    ));
+  }
+
+  async publishDocumentAsset(input: {
+    actor_id: string;
+    expected_revision: number;
+    asset_id?: string;
+    document_id?: string;
+    occurred_at?: string;
+  }): Promise<DemoState> {
+    return this.mutateDocument(input.expected_revision, (state) => publishGovernedDocumentAsset(
+      state.asset_registry,
+      {
+        ...(input.asset_id ? { asset_id: input.asset_id } : {}),
+        ...(input.document_id ? { document_id: input.document_id } : {}),
+        actor: this.resolveActor(input.actor_id),
+        occurred_at: input.occurred_at ?? new Date().toISOString(),
+        current_linked_file_versions: new Map(state.files
+          .filter((file) => file.status === "published" && !file.superseded && file.external_shareable)
+          .map((file) => [file.id, file.building_id])),
+      },
+    ));
   }
 
   async importRequest(input: {
@@ -673,19 +812,48 @@ export class DemoFileStore {
     return this.mutateReport(input.expected_revision, async (state) => {
       const [config, canonicalDraft] = await Promise.all([
         this.configLoader(),
-        this.reportDraftLoader(),
+        this.reportDraftLoader(input.draft.building_id),
       ]);
       if (state.stage !== "published") throw new Error("Weekly report drafting requires the Stage 2 published state.");
       this.assertConfiguredAccess(config, input.actor_id, input.draft.building_id);
-      this.assertReportConfiguration(input.draft, config);
-      this.assertCanonicalWeeklyReportSources(input.draft.sources, canonicalDraft.sources);
-      return createWeeklyReportDraft(
+      this.assertCanonicalWeeklyReportDraft(input.draft, canonicalDraft);
+      const authority = this.findReportAuthority(config, input.draft.building_id);
+      if (!authority) throw new WeeklyReportStaleError(state.revision);
+      if (input.actor_id !== authority.owner_user_id && input.actor_id !== authority.approver_user_id) {
+        throw new WorkflowAccessError("저장된 업무 담당자 또는 승인자만 이 건물 보고를 준비할 수 있습니다.");
+      }
+      const reports = createWeeklyReportDraft(
         state.operations.reports,
-        input.draft,
-        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+        {
+          ...input.draft,
+          sections: applyConfiguredWeeklyReportSections(
+            input.draft.sections,
+            authority.automation.required_section_keys,
+          ),
+          recipients: {
+            configuration_id: authority.configuration_id,
+            to: authority.recipients.to.map(({ email, role }) => ({ email, role })),
+            cc: authority.recipients.cc.map(({ email, role }) => ({ email, role })),
+          },
+        },
+        this.currentWeeklyReportMaterialIds(canonicalDraft),
         this.resolveActor(input.actor_id),
         input.occurred_at ?? new Date().toISOString(),
       );
+      const audit = [...reports.audit];
+      const draftedEvent = audit.at(-1);
+      if (!draftedEvent) throw new Error("Weekly-report drafting did not produce the required audit event.");
+      audit[audit.length - 1] = {
+        ...draftedEvent,
+        metadata: {
+          ...draftedEvent.metadata,
+          report_group_ref: authority.group_ref,
+          recipient_configuration_id: authority.configuration_id,
+          approver_user_id: authority.approver_user_id,
+          settings_revision: authority.settings_revision,
+        },
+      };
+      return { ...reports, audit };
     });
   }
 
@@ -696,13 +864,19 @@ export class DemoFileStore {
     candidate: WeeklyReportPatchCandidate;
     occurred_at?: string;
   }): Promise<DemoRuntimeState> {
-    return this.mutateReport(input.expected_revision, (state) => proposeWeeklyReportPatch(
-      state.operations.reports,
-      input.report_id,
-      input.candidate,
-      this.resolveActor(input.actor_id),
-      input.occurred_at ?? new Date().toISOString(),
-    ));
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      this.requireRevision(state, input.expected_revision);
+      const occurredAt = input.occurred_at ?? new Date().toISOString();
+      await this.requireCurrentWeeklyReportPreparation(state, input.actor_id, input.report_id, occurredAt);
+      return this.persistReportMutation(state, proposeWeeklyReportPatch(
+        state.operations.reports,
+        input.report_id,
+        input.candidate,
+        this.resolveActor(input.actor_id),
+        occurredAt,
+      ));
+    });
   }
 
   async decideWeeklyReportPatch(input: {
@@ -712,13 +886,37 @@ export class DemoFileStore {
     decision: "accept" | "reject";
     occurred_at?: string;
   }): Promise<DemoRuntimeState> {
-    return this.mutateReport(input.expected_revision, (state) => decideWeeklyReportPatch(
-      state.operations.reports,
-      input.report_id,
-      input.decision,
-      this.resolveActor(input.actor_id),
-      input.occurred_at ?? new Date().toISOString(),
-    ));
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      this.requireRevision(state, input.expected_revision);
+      const occurredAt = input.occurred_at ?? new Date().toISOString();
+      await this.requireCurrentWeeklyReportPreparation(state, input.actor_id, input.report_id, occurredAt);
+      return this.persistReportMutation(state, decideWeeklyReportPatch(
+        state.operations.reports,
+        input.report_id,
+        input.decision,
+        this.resolveActor(input.actor_id),
+        occurredAt,
+      ));
+    });
+  }
+
+  async assertWeeklyReportPreparationAccess(input: {
+    actor_id: string;
+    expected_revision: number;
+    report_id: string;
+    occurred_at?: string;
+  }): Promise<void> {
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      this.requireRevision(state, input.expected_revision);
+      await this.requireCurrentWeeklyReportPreparation(
+        state,
+        input.actor_id,
+        input.report_id,
+        input.occurred_at ?? new Date().toISOString(),
+      );
+    });
   }
 
   async approveWeeklyReport(input: {
@@ -732,7 +930,7 @@ export class DemoFileStore {
       const report = this.requireWeeklyReport(state, input.report_id);
       const [config, canonicalDraft] = await Promise.all([
         this.configLoader(),
-        this.reportDraftLoader(),
+        this.reportDraftLoader(report.building_id),
       ]);
       this.assertConfiguredAccess(config, input.actor_id, report.building_id);
       this.requireRevision(state, input.expected_revision);
@@ -750,11 +948,16 @@ export class DemoFileStore {
         await this.persistReportMutation(state, currentReports);
         throw new WeeklyReportStaleError(state.revision + 1);
       }
+      const authority = this.findReportAuthority(config, report.building_id);
+      if (!authority) throw new WeeklyReportStaleError(state.revision);
+      if (input.actor_id !== authority.approver_user_id) {
+        throw new WorkflowAccessError("이 건물 보고에 저장된 최종 승인자만 승인할 수 있습니다.");
+      }
       const reports = approveWeeklyReport(
         state.operations.reports,
         input.report_id,
-        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
-        this.requireReportConfiguration(config).configuration_id,
+        this.currentWeeklyReportMaterialIds(canonicalDraft),
+        authority.configuration_id,
         actor,
         occurredAt,
       );
@@ -774,7 +977,7 @@ export class DemoFileStore {
       const report = this.requireWeeklyReport(state, input.report_id);
       const [config, canonicalDraft] = await Promise.all([
         this.configLoader(),
-        this.reportDraftLoader(),
+        this.reportDraftLoader(report.building_id),
       ]);
       this.assertConfiguredAccess(config, input.actor_id, report.building_id);
       assertWeeklyReportIntegrity(report);
@@ -794,12 +997,17 @@ export class DemoFileStore {
         await this.persistReportMutation(state, currentReports);
         throw new WeeklyReportStaleError(state.revision + 1);
       }
+      const authority = this.findReportAuthority(config, report.building_id);
+      if (!authority) throw new WeeklyReportStaleError(state.revision);
+      if (report.approval.approved_by !== authority.approver_user_id) {
+        throw new Error("현재 설정에 저장된 최종 승인자의 확인이 필요합니다.");
+      }
       const reports = sendWeeklyReport(
         state.operations.reports,
         input.report_id,
         input.idempotency_key,
-        this.currentWeeklyReportMaterialIds(state, canonicalDraft),
-        this.requireReportConfiguration(config).configuration_id,
+        this.currentWeeklyReportMaterialIds(canonicalDraft),
+        authority.configuration_id,
         actor,
         occurredAt,
       );
@@ -820,19 +1028,11 @@ export class DemoFileStore {
     }
   }
 
-  private requireReportConfiguration(config: DemoRuntimeConfiguration): ConfiguredReportRecipientGroup {
-    if (!config.reportRecipients) throw new Error("No configured weekly-report recipient group is available.");
-    return config.reportRecipients;
-  }
-
-  private assertReportConfiguration(draft: CreateWeeklyReportDraftInput, config: DemoRuntimeConfiguration): void {
-    const current = this.requireReportConfiguration(config);
-    if (draft.building_id !== current.building_id
-      || draft.recipients.configuration_id !== current.configuration_id
-      || JSON.stringify(draft.recipients.to) !== JSON.stringify(current.to)
-      || JSON.stringify(draft.recipients.cc) !== JSON.stringify(current.cc)) {
-      throw new Error("Weekly-report recipients diverged from the current exact configured group.");
-    }
+  private findReportAuthority(
+    config: DemoRuntimeConfiguration,
+    buildingId: string,
+  ): ConfiguredWeeklyReportAuthority | undefined {
+    return config.reportAuthorities?.find((item) => item.building_id === buildingId);
   }
 
   private requireWeeklyReport(state: DemoRuntimeState, reportId: string) {
@@ -842,22 +1042,67 @@ export class DemoFileStore {
   }
 
   private currentWeeklyReportMaterialIds(
-    state: DemoRuntimeState,
     canonicalDraft: CreateWeeklyReportDraftInput,
   ): Set<string> {
-    const canonicalSourceIds = canonicalDraft.sources.map((source) => source.id);
-    return new Set([...currentDemoMaterialVersionIds(state), ...canonicalSourceIds]);
+    return new Set([
+      ...canonicalDraft.material_version_ids,
+      ...canonicalDraft.attachments.map((attachment) => attachment.version_id),
+      ...canonicalDraft.sources.map((source) => source.id),
+    ]);
   }
 
-  private assertCanonicalWeeklyReportSources(
-    sources: WeeklyReportState["reports"][number]["sources"],
-    canonical: WeeklyReportState["reports"][number]["sources"],
+  private assertCanonicalWeeklyReportDraft(
+    draft: CreateWeeklyReportDraftInput,
+    canonical: CreateWeeklyReportDraftInput,
   ): void {
-    const normalized = (items: typeof sources) => [...items]
+    const normalizedSources = (items: WeeklyReportState["reports"][number]["sources"]) => [...items]
       .map((source) => ({ ...source }))
       .sort((left, right) => left.id.localeCompare(right.id) || JSON.stringify(left).localeCompare(JSON.stringify(right)));
-    if (JSON.stringify(normalized(sources)) !== JSON.stringify(normalized(canonical))) {
-      throw new Error("Weekly-report sources diverged from the canonical current synthetic source set.");
+    const protectedInput = (input: CreateWeeklyReportDraftInput) => ({
+      id: input.id,
+      building_id: input.building_id,
+      reporting_period: input.reporting_period,
+      sections: input.sections,
+      sources: normalizedSources(input.sources),
+      attachments: [...input.attachments].sort((left, right) => left.id.localeCompare(right.id)),
+      material_version_ids: [...input.material_version_ids].sort(),
+      cover: input.cover,
+      unresolved: input.unresolved ?? [],
+    });
+    if (JSON.stringify(protectedInput(draft)) !== JSON.stringify(protectedInput(canonical))) {
+      throw new Error("Weekly-report draft diverged from the canonical current building-specific material set.");
+    }
+  }
+
+  private async requireCurrentWeeklyReportPreparation(
+    state: DemoRuntimeState,
+    actorId: string,
+    reportId: string,
+    occurredAt: string,
+  ): Promise<void> {
+    const report = this.requireWeeklyReport(state, reportId);
+    const [config, canonicalDraft] = await Promise.all([
+      this.configLoader(),
+      this.reportDraftLoader(report.building_id),
+    ]);
+    this.assertConfiguredAccess(config, actorId, report.building_id);
+    const actor = this.resolveActor(actorId);
+    const currentReports = this.markReportStaleForCurrentInputs(
+      state,
+      reportId,
+      config,
+      canonicalDraft,
+      actor,
+      occurredAt,
+    );
+    if (currentReports !== state.operations.reports) {
+      await this.persistReportMutation(state, currentReports);
+      throw new WeeklyReportStaleError(state.revision + 1);
+    }
+    const authority = this.findReportAuthority(config, report.building_id);
+    if (!authority) throw new WeeklyReportStaleError(state.revision);
+    if (actorId !== authority.owner_user_id && actorId !== authority.approver_user_id) {
+      throw new WorkflowAccessError("저장된 업무 담당자 또는 승인자만 이 건물 보고를 변경할 수 있습니다.");
     }
   }
 
@@ -869,23 +1114,23 @@ export class DemoFileStore {
     actor: { id: string; role: UserRole },
     occurredAt: string,
   ): WeeklyReportState {
-    const currentRecipients = config.reportRecipients;
-    const currentRecipientConfigurationId = currentRecipients?.configuration_id
+    const currentAuthority = config.reportAuthorities?.find((item) => item.building_id === canonicalDraft.building_id);
+    const currentRecipientConfigurationId = currentAuthority?.configuration_id
       ?? "missing-weekly-report-recipient-configuration";
     return markWeeklyReportStale(
       state.operations.reports,
       reportId,
-      this.currentWeeklyReportMaterialIds(state, canonicalDraft),
+      this.currentWeeklyReportMaterialIds(canonicalDraft),
       currentRecipientConfigurationId,
       actor,
       occurredAt,
       {
         current_sources: canonicalDraft.sources,
-        ...(currentRecipients ? {
+        ...(currentAuthority ? {
           current_recipients: {
-            configuration_id: currentRecipients.configuration_id,
-            to: currentRecipients.to,
-            cc: currentRecipients.cc,
+            configuration_id: currentAuthority.configuration_id,
+            to: currentAuthority.recipients.to,
+            cc: currentAuthority.recipients.cc,
           },
         } : { recipient_content_drift: true }),
       },
@@ -946,6 +1191,24 @@ export class DemoFileStore {
     });
   }
 
+  private async mutateDocument(
+    expectedRevision: number,
+    command: (state: DemoRuntimeState) => GovernedAssetRegistry,
+  ): Promise<DemoRuntimeState> {
+    return withPathLock(this.storePath, async () => {
+      const state = await this.readOrInitialize();
+      this.requireRevision(state, expectedRevision);
+      const next: DemoRuntimeState = {
+        ...state,
+        revision: state.revision + 1,
+        asset_registry: command(state),
+      };
+      this.assertDocumentLifecycleOfficialStateUnchanged(state, next);
+      await this.writeState(next);
+      return next;
+    });
+  }
+
   private async mutateReport(
     expectedRevision: number,
     command: (state: DemoRuntimeState) => WeeklyReportState | Promise<WeeklyReportState>,
@@ -999,6 +1262,22 @@ export class DemoFileStore {
     }
   }
 
+  private assertDocumentLifecycleOfficialStateUnchanged(
+    before: DemoRuntimeState,
+    after: DemoRuntimeState,
+  ): void {
+    const officialState = (state: DemoRuntimeState) => ({
+      stage: state.stage,
+      candidates: state.candidates,
+      records: state.records,
+      files: state.files,
+    });
+    if (JSON.stringify(officialState(before)) !== JSON.stringify(officialState(after))
+      || JSON.stringify(createDemoDraftMaterial(before)) !== JSON.stringify(createDemoDraftMaterial(after))) {
+      throw new Error("Document lifecycle attempted to mutate official publication material.");
+    }
+  }
+
   private requireRevision(state: DemoRuntimeState, expected: number): void {
     if (state.revision !== expected) throw new RevisionConflictError(expected, state.revision);
   }
@@ -1007,10 +1286,13 @@ export class DemoFileStore {
     try {
       const raw = await readFile(this.storePath, "utf8");
       const parsed: unknown = JSON.parse(raw);
+      const parsedRecord = parsed as Record<string, unknown>;
+      const parsedAssets = (parsedRecord.asset_registry as { assets?: Array<Record<string, unknown>> } | undefined)?.assets;
       const shouldPersistMigration = (parsed as { schema_version?: unknown }).schema_version === 1
         || (parsed as { schema_version?: unknown }).schema_version === 2
         || ((parsed as { schema_version?: unknown }).schema_version === 3
-          && !("asset_registry" in (parsed as Record<string, unknown>)));
+          && (!("asset_registry" in parsedRecord)
+            || parsedAssets?.some((asset) => !hasPersistedDocumentLifecycleFields(asset)) === true));
       const state = parsePersistedState(parsed);
       if (shouldPersistMigration) await this.writeValidatedState(state);
       return state;

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LeaseFlow 관리자 웹 IA</title>
+  <style>
+    :root {
+      --ink: #14263a;
+      --ink-2: #334b62;
+      --muted: #64788b;
+      --paper: #f4f7f8;
+      --surface: #ffffff;
+      --line: #d9e2e7;
+      --navy: #173c5b;
+      --teal: #197d78;
+      --teal-soft: #e6f3f1;
+      --amber: #d9972d;
+      --amber-soft: #fff4df;
+      --blue-soft: #eaf1f7;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 2400px; height: 1600px; overflow: hidden; }
+    body {
+      font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 88% 2%, rgba(25,125,120,.10), transparent 27%),
+        linear-gradient(135deg, #f9fbfb 0%, var(--paper) 100%);
+    }
+
+    .canvas { width: 100%; height: 100%; padding: 72px 76px 64px; }
+    header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 42px; }
+    .eyebrow { color: var(--teal); font-size: 23px; font-weight: 800; letter-spacing: .03em; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 68px; line-height: 1.08; letter-spacing: -.04em; }
+    .subtitle { margin: 18px 0 0; font-size: 27px; color: var(--ink-2); font-weight: 550; }
+    .principle {
+      width: 660px; padding: 22px 28px; border: 1px solid #bfd4d2; border-left: 8px solid var(--teal);
+      border-radius: 14px; background: rgba(255,255,255,.86); box-shadow: 0 14px 40px rgba(26,57,76,.08);
+      font-size: 24px; line-height: 1.5; color: var(--ink-2);
+    }
+    .principle strong { color: var(--ink); }
+
+    .layout { display: grid; grid-template-columns: 640px 1fr; gap: 34px; height: 1310px; }
+    .panel { background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 18px 50px rgba(27,52,70,.08); }
+
+    .nav-panel { padding: 30px; }
+    .section-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+    .section-title h2 { margin: 0; font-size: 31px; letter-spacing: -.025em; }
+    .section-title span { font-size: 19px; color: var(--muted); }
+    .nav-list { display: grid; gap: 12px; }
+    .nav-item {
+      display: grid; grid-template-columns: 58px 192px 1fr; gap: 14px; align-items: center;
+      min-height: 118px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: #fbfcfd;
+    }
+    .nav-item.active { background: var(--teal-soft); border-color: #9fc9c5; box-shadow: inset 5px 0 0 var(--teal); }
+    .num {
+      width: 48px; height: 48px; display: grid; place-items: center; border-radius: 13px;
+      background: var(--blue-soft); color: var(--navy); font-size: 21px; font-weight: 850;
+    }
+    .active .num { background: var(--teal); color: white; }
+    .nav-name { font-size: 25px; font-weight: 800; letter-spacing: -.02em; }
+    .nav-desc { color: var(--ink-2); font-size: 19px; line-height: 1.42; }
+    .nav-desc b { color: var(--ink); font-weight: 750; }
+
+    .content { display: grid; grid-template-rows: 252px 1fr 230px; gap: 26px; }
+    .spine { padding: 26px 30px; }
+    .spine-row { display: grid; grid-template-columns: 1fr 56px 1fr 56px 1fr 56px 1fr; align-items: stretch; }
+    .spine-card { border-radius: 16px; padding: 22px; border: 1px solid var(--line); background: #fbfcfd; }
+    .spine-card.current { border-color: #9fc9c5; background: var(--teal-soft); }
+    .spine-card.report { border-color: #efcf98; background: var(--amber-soft); }
+    .spine-step { font-size: 16px; color: var(--muted); font-weight: 850; letter-spacing: .05em; }
+    .spine-card h3 { margin: 9px 0 7px; font-size: 25px; }
+    .spine-card p { margin: 0; color: var(--ink-2); font-size: 18px; line-height: 1.42; }
+    .arrow { display: grid; place-items: center; color: var(--teal); font-size: 38px; font-weight: 300; }
+
+    .detail-grid { display: grid; grid-template-columns: 1.13fr .87fr; gap: 26px; }
+    .report-panel, .app-panel { padding: 30px; }
+    .report-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .report-head h2 { margin: 0; font-size: 32px; }
+    .pill { background: var(--amber-soft); color: #7b561b; border: 1px solid #e8c37e; border-radius: 999px; padding: 9px 15px; font-size: 17px; font-weight: 800; }
+    .tree { margin-top: 22px; display: grid; gap: 14px; }
+    .tree-node { position: relative; border-radius: 14px; border: 1px solid var(--line); padding: 16px 18px; background: #fbfcfd; }
+    .tree-node.level-1 { background: var(--navy); color: white; border-color: var(--navy); }
+    .tree-node.level-2 { margin-left: 42px; background: var(--amber-soft); border-color: #e9ca91; }
+    .tree-node.level-3 { margin-left: 84px; }
+    .tree-node.level-4 { margin-left: 126px; background: #f7fafb; }
+    .tree-node:before { content: ""; position: absolute; left: -22px; top: 50%; width: 14px; border-top: 2px solid #b7c7cf; }
+    .level-1:before { display: none; }
+    .node-title { font-size: 22px; font-weight: 850; }
+    .node-meta { margin-top: 5px; font-size: 17px; line-height: 1.4; color: var(--muted); }
+    .level-1 .node-meta { color: #cbd7e0; }
+    .settings-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+    .setting { border-top: 3px solid var(--teal); background: #f7fafb; border-radius: 11px; padding: 13px 14px; }
+    .setting b { font-size: 18px; }
+    .setting span { display: block; margin-top: 5px; color: var(--muted); font-size: 15px; line-height: 1.35; }
+
+    .app-panel { display: flex; flex-direction: column; }
+    .app-panel h2 { margin: 0; font-size: 32px; }
+    .phone { margin-top: 20px; border: 9px solid var(--ink); border-radius: 34px; padding: 20px; background: white; }
+    .phone-top { display: flex; justify-content: space-between; font-size: 15px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 13px; }
+    .phone h3 { margin: 17px 0 12px; font-size: 24px; }
+    .fact { display: flex; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid #edf1f3; font-size: 17px; }
+    .fact span { color: var(--muted); }
+    .fact b { text-align: right; }
+    .app-rules { margin-top: 18px; display: grid; gap: 10px; }
+    .rule { padding: 13px 15px; border-radius: 12px; background: var(--teal-soft); color: #245d59; font-size: 17px; line-height: 1.4; }
+    .rule strong { color: #174f4b; }
+
+    .guardrails { display: grid; grid-template-columns: 1.1fr repeat(4,1fr); gap: 16px; padding: 25px 28px; align-items: stretch; }
+    .guard-title { display: flex; flex-direction: column; justify-content: center; }
+    .guard-title small { color: var(--teal); font-weight: 850; font-size: 16px; letter-spacing: .06em; }
+    .guard-title h2 { margin: 7px 0 0; font-size: 29px; }
+    .guard { display: flex; align-items: center; padding: 15px 17px; border-left: 3px solid var(--teal); background: #f7fafb; border-radius: 9px; font-size: 17px; line-height: 1.4; color: var(--ink-2); }
+    .guard b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <header>
+      <div>
+        <div class="eyebrow">LEASEFLOW · ADMIN INFORMATION ARCHITECTURE</div>
+        <h1>등록은 한 번, 최신정보·주간보고·앱은 같이 움직인다</h1>
+        <p class="subtitle">시스템 단계를 나열하지 않고 사용자의 실제 업무 순서로 구성한 관리자 웹 IA</p>
+      </div>
+      <div class="principle"><strong>제품의 중심 질문</strong><br>무엇이 새로 들어왔고, 무엇이 달라졌으며, 지금 믿고 쓸 수 있는 정보와 이번 임대인 미팅의 이슈는 무엇인가?</div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel nav-panel">
+        <div class="section-title"><h2>전역 메뉴 7개</h2><span>업무 목적 중심</span></div>
+        <div class="nav-list">
+          <div class="nav-item"><div class="num">01</div><div class="nav-name">업무 홈</div><div class="nav-desc"><b>오늘의 할 일</b><br>마감 예정 · 막힌 업무 · 담당자</div></div>
+          <div class="nav-item"><div class="num">02</div><div class="nav-name">원자료</div><div class="nav-desc"><b>자료 등록</b><br>받은 파일함 · 원본 보관 · 자료 버전</div></div>
+          <div class="nav-item"><div class="num">03</div><div class="nav-name">정보 확인</div><div class="nav-desc"><b>달라진 내용 확인</b><br>자동 분류 · 추출값 · 이전값 비교 · 보완</div></div>
+          <div class="nav-item"><div class="num">04</div><div class="nav-name">최신 운영정보</div><div class="nav-desc"><b>현재값 관리</b><br>승인 대기 · 게시 정보 · 도면·파일 · 변경 이력</div></div>
+          <div class="nav-item active"><div class="num">05</div><div class="nav-name">주간업무보고</div><div class="nav-desc"><b>임대인 미팅 준비</b><br>이번 주 · 보고서 · 자동화 설정 · 보고 이력</div></div>
+          <div class="nav-item"><div class="num">06</div><div class="nav-name">앱 제공정보</div><div class="nav-desc"><b>현장에 보이는 정보</b><br>노출 항목 · 최신 파일 · 건물 검색 · 제공 상태</div></div>
+          <div class="nav-item"><div class="num">07</div><div class="nav-name">운영 설정·기록</div><div class="nav-desc"><b>운영 기준 관리</b><br>임대인·건물 · 수신자 · 권한 · 감사기록</div></div>
+        </div>
+      </aside>
+
+      <div class="content">
+        <section class="panel spine">
+          <div class="section-title"><h2>서비스의 공통 정보 흐름</h2><span>한 번 확인한 최신정보를 두 업무에서 재사용</span></div>
+          <div class="spine-row">
+            <div class="spine-card"><div class="spine-step">INPUT</div><h3>임대인 원자료</h3><p>PDF · Excel · 도면 · 이메일 첨부를 원본 그대로 자산화</p></div>
+            <div class="arrow">→</div>
+            <div class="spine-card"><div class="spine-step">REVIEW</div><h3>정보 확인</h3><p>건물 연결, 추출값 검토, 이전 최신값과 변경 비교</p></div>
+            <div class="arrow">→</div>
+            <div class="spine-card current"><div class="spine-step">SOURCE OF TRUTH</div><h3>최신 운영정보</h3><p>사람이 승인·게시한 현재값과 유효한 최신 파일</p></div>
+            <div class="arrow">↗</div>
+            <div class="spine-card report"><div class="spine-step">REUSE</div><h3>보고서 + 앱</h3><p>같은 최신정보를 주간보고와 현장 앱에서 안전하게 사용</p></div>
+          </div>
+        </section>
+
+        <div class="detail-grid">
+          <section class="panel report-panel">
+            <div class="report-head"><h2>주간업무보고 IA</h2><span class="pill">최상위 기준 = 임대인</span></div>
+            <div class="tree">
+              <div class="tree-node level-1"><div class="node-title">임대인</div><div class="node-meta">주간 미팅과 외부 보고의 최상위 상대방</div></div>
+              <div class="tree-node level-2"><div class="node-title">보고그룹</div><div class="node-meta">동일한 일정·수신자·양식으로 묶어 보고할 건물 집합</div></div>
+              <div class="tree-node level-3"><div class="node-title">포함 건물 A · B · C</div><div class="node-meta">건물별 최신정보 · 1주일 업무활동 · 이슈 · 근거자료</div></div>
+              <div class="tree-node level-4"><div class="node-title">이번 주 보고 실행</div><div class="node-meta">전체 요약 → 건물별 이슈 → 다음 주 예정 → 임대인 의사결정 요청</div></div>
+            </div>
+            <div class="settings-grid">
+              <div class="setting"><b>기본 범위</b><span>임대인 · 보고그룹 · 포함 건물</span></div>
+              <div class="setting"><b>수집 기준</b><span>보고기간 · 포함 활동 · 변경정보 · 누락 처리</span></div>
+              <div class="setting"><b>준비 일정</b><span>사전 취합 · 담당자 확인 · 최종 검토 · 미팅</span></div>
+              <div class="setting"><b>외부 전달</b><span>To/Cc · 양식 · 언어 · 승인자 · 첨부 범위</span></div>
+            </div>
+          </section>
+
+          <section class="panel app-panel">
+            <h2>앱은 ‘게시된 현재값’만 사용</h2>
+            <div class="phone">
+              <div class="phone-top"><span>LeaseFlow Mobile</span><b>현재 정보</b></div>
+              <h3>퍼시픽타워</h3>
+              <div class="fact"><span>가용 면적</span><b>12F · 1,240㎡</b></div>
+              <div class="fact"><span>입주 가능</span><b>즉시 협의</b></div>
+              <div class="fact"><span>최신 도면</span><b>2026.07 게시본</b></div>
+              <div class="fact"><span>정보 기준시각</span><b>7월 19일 09:30</b></div>
+            </div>
+            <div class="app-rules">
+              <div class="rule"><strong>보이지 않음</strong> · 원자료, 미확인 추출값, 폐기된 도면</div>
+              <div class="rule"><strong>보임</strong> · 게시됨, 활성, 권한 허용, 외부 공유 가능 정보</div>
+              <div class="rule"><strong>같은 근거</strong> · 앱의 정보와 주간보고의 건물 사실이 동일 버전을 참조</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel guardrails">
+          <div class="guard-title"><small>TRUST BOUNDARY</small><h2>자동화하되 넘지 않는 선</h2></div>
+          <div class="guard"><span><b>원자료 ≠ 최신정보</b><br>등록만으로 공식값을 덮어쓰지 않음</span></div>
+          <div class="guard"><span><b>AI = 제안</b><br>추출·요약·보고문은 검토 전 후보</span></div>
+          <div class="guard"><span><b>외부 보고 = 승인</b><br>정확한 대상과 내용을 사람이 확인</span></div>
+          <div class="guard"><span><b>모든 결과 = 추적</b><br>출처·버전·담당자·시점을 감사기록에 남김</span></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

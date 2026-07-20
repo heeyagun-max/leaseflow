@@ -1,0 +1,27 @@
+1
+00:00:00,900 --> 00:00:24,000
+I built LeaseFlow because my husband was trapped in a serious leasing workflow bottleneck. I use AI every day, but he does not. Instead of asking him to become an AI power user, I used Codex to turn the work he already does into one calm, shared workspace.
+
+2
+00:00:25,900 --> 00:00:49,000
+Landlords send new leasing facts in files: available floors, areas, parking, incentives, dates, and floor plans. A team member uploads the original file, and LeaseFlow converts it into structured proposed changes while preserving the source.
+
+3
+00:00:50,900 --> 00:01:14,000
+AI never publishes operational facts by itself. The data steward reviews every extracted change. A senior then approves the new version. Only published, active, authorized information becomes current.
+
+4
+00:01:15,900 --> 00:01:39,000
+Once approved, the same current record appears everywhere. The web view links to the original source file. The mobile app uses that published record in the field, so the whole team works from the same answer.
+
+5
+00:01:40,900 --> 00:02:04,000
+A call or email request becomes a structured task. LeaseFlow selects only current shareable materials, prepares the message and recipients, and still requires human review and approval before delivery.
+
+6
+00:02:05,900 --> 00:02:29,000
+Weekly reporting is organized by landlord. The team configures buildings, schedule, required sections, owners, approvers, and recipients once. LeaseFlow gathers approved building activity into reports that remain building specific and human approved.
+
+7
+00:02:30,900 --> 00:02:54,000
+Codex helped me turn conversations, workflow corrections, and messy source examples into a tested product prototype. LeaseFlow is my first example of Codex for Everyone: AI adapts to the worker, instead of asking every worker to become an AI expert.

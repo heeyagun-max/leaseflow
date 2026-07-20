@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex for Everyone"
+  short_description: "Turn lived work into a tested Codex workflow"
+  default_prompt: "Use $codex-for-everyone to turn my real workflow and bottlenecks into a testable product plan."

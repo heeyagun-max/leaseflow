@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialDemoState } from "@leaseflow/demo-data";
-import { toPublicWorkflow } from "./mobile-workflow-public.server";
+import { renderPublicPackageBody, toPublicWorkflow } from "./mobile-workflow-public.server";
 
 describe("curated mobile workflow boundary", () => {
   it("recursively excludes persisted secrets and internal workflow fields", () => {
@@ -18,5 +18,26 @@ describe("curated mobile workflow boundary", () => {
     visit(output);
     expect(JSON.stringify(output)).not.toContain("secret raw text");
     expect(JSON.stringify(output)).not.toContain("secret-source");
+  });
+
+  it("renders external-facing Korean package copy without protected implementation markers", () => {
+    const body = renderPublicPackageBody(
+      [
+        { label: "Marketed area", value: 200, unit: "py" },
+        { label: "Rent-free", value: 2, unit: "months" },
+        { label: "Supported parking", value: 2, unit: "spaces" },
+      ],
+      [{ filename: "CFC_5F_plan_v2.svg" }],
+    );
+    expect(body).toContain("임대 가능 면적: 200평");
+    expect(body).toContain("렌트프리: 2개월");
+    expect(body).toContain("지원 주차: 2대");
+    expect(body).toContain("첨부 자료: CFC_5F_plan_v2.svg");
+    expect(body).not.toMatch(/PROTECTED|version=|source=|Current published/i);
+    expect(renderPublicPackageBody(
+      [{ label: "Marketed area", value: 200, unit: "py" }],
+      [],
+      "concise_courteous",
+    )).not.toBe(body);
   });
 });

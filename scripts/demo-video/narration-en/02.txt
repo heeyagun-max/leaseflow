@@ -1,0 +1,1 @@
+Landlords send new leasing facts in files: available floors, areas, parking, incentives, dates, and floor plans. A team member selects the building and source type, uploads the original file, and LeaseFlow converts it into structured proposed changes while preserving the source.

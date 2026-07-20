@@ -13,7 +13,7 @@ let server;
 before(async () => {
   server = createServer((request, response) => {
     response.setHeader("Content-Type", "application/json");
-    if (request.method === "GET" && request.url === "/api/demo/workflow") {
+    if (request.method === "GET" && request.url === "/api/demo/workflow?actor_id=usr-manager") {
       workflowReads += 1;
       response.end(JSON.stringify({ state: { revision } }));
       return;

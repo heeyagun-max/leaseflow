@@ -1,0 +1,1 @@
+Once approved, the same current record appears everywhere. The web view shows every leasing field and a direct link to the original source file. The mobile app uses that published record in the field, so the whole team works from the same answer without learning a new AI interface.

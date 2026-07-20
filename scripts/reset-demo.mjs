@@ -22,8 +22,8 @@ async function readJson(response, label) {
   }
 }
 
-async function getRevision(fetchImpl, baseUrl) {
-  const response = await fetchImpl(`${baseUrl}/api/demo/workflow`, {
+async function getRevision(fetchImpl, baseUrl, actorId) {
+  const response = await fetchImpl(`${baseUrl}/api/demo/workflow?actor_id=${encodeURIComponent(actorId)}`, {
     headers: { Accept: "application/json" },
   });
   const body = await readJson(response, "Demo workflow");
@@ -50,7 +50,7 @@ export async function resetDemo({
   fetchImpl = fetch,
 } = {}) {
   const apiBaseUrl = normalizedBaseUrl(baseUrl);
-  let revision = await getRevision(fetchImpl, apiBaseUrl);
+  let revision = await getRevision(fetchImpl, apiBaseUrl, actorId);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const { response, body } = await postReset(fetchImpl, apiBaseUrl, actorId, revision);

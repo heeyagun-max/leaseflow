@@ -2,7 +2,21 @@
 
 The checked-in MP4 is generated only from LeaseFlow synthetic runtime/UI. No user-supplied landlord PDF, DWG, XLSX, or DOCX file is opened or shown.
 
-## Final local artifact
+## Final English submission artifact
+
+- Path: `artifacts/submission/LeaseFlow_OpenAI_Build_Week_Demo_EN.mp4`
+- Duration: 175.046 seconds
+- Dimensions/codecs: 1920×1080, H.264 + MPEG-4 AAC
+- Size: 4,826,644 bytes
+- SHA-256: `d1fe481407cc9f5677b286bbacef79043cf913dc9cc7f19d3cdb0df9f468e808`
+- Narration: English, seven 25-second chapters
+- Captions: `docs/submission/LeaseFlow_OpenAI_Build_Week_Demo_EN.srt`
+- Automated content checks: eight sampled frames, synthetic marker present, zero generic secret-pattern matches
+- Manual visual checks: source upload, human publication, web/mobile current information, customer package, weekly report automation, and closing frame passed
+
+The final file is ready for a Public YouTube upload. A YouTube URL and signed-out playback are not claimed until that external upload is completed.
+
+## Previous Korean local artifact
 
 - Path: `artifacts/submission/LeaseFlow_Hackathon_Demo_KO.mp4`
 - Duration: 109.145 seconds
@@ -32,19 +46,25 @@ DEMO_MODE=true SANDBOX_EMAIL_MODE=true \
 npm run demo:mobile
 ```
 
-3. Capture the current synthetic UI and render the Korean narration:
+3. Capture the current synthetic UI and render the English submission video:
+
+```bash
+./scripts/demo-video/capture-en.sh
+./scripts/demo-video/render-en.sh
+```
+
+The previous Korean narration can still be rebuilt with:
 
 ```bash
 zsh scripts/demo-video/capture.sh
 zsh scripts/demo-video/render.sh
 ```
 
-4. Verify the playable tracks, duration, dimensions, and size:
+4. Verify the English playable tracks, duration, dimensions, size, and sampled frames:
 
 ```bash
-swift scripts/demo-video/probe.swift artifacts/submission/LeaseFlow_Hackathon_Demo_KO.mp4
-swift scripts/demo-video/verify-content.swift artifacts/submission/video-frames
-swift scripts/demo-video/sample.swift artifacts/submission/LeaseFlow_Hackathon_Demo_KO.mp4 artifacts/submission/video-samples
+swift scripts/demo-video/probe.swift artifacts/submission/LeaseFlow_OpenAI_Build_Week_Demo_EN.mp4
+swift scripts/demo-video/verify-content.swift artifacts/submission/video-samples-en
 ```
 
 For a local sensitive-identifier check without committing identifiers or derived values, put one blocked term per line in a file outside the repository and run:

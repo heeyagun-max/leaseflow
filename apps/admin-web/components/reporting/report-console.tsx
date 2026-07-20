@@ -19,6 +19,7 @@ export function buildReportMutationBody(input: {
   action: ReportMutationAction;
   actorId: string;
   decision?: "accept" | "reject";
+  buildingId?: string;
   reportId?: string;
   revision: number;
 }) {
@@ -27,7 +28,8 @@ export function buildReportMutationBody(input: {
     actor_id: input.actorId,
     expected_revision: input.revision,
   };
-  if (input.action !== "draft") body.report_id = input.reportId;
+  if (input.action === "draft") body.building_id = input.buildingId;
+  else body.report_id = input.reportId;
   if (input.action === "investigate") body.command = EMAIL_INVESTIGATION;
   if (input.action === "decide_patch") body.decision = input.decision;
   if (input.action === "send" && input.reportId) body.idempotency_key = `sandbox-${input.reportId}-delivery`;
@@ -87,6 +89,56 @@ function reportValue(value: unknown): string {
   return "내용 없음";
 }
 
+function reportSectionLabel(section: string): string {
+  return isReportSectionKey(section) ? sectionLabels[section] : "보고 항목";
+}
+
+function isReportSectionKey(section: string): section is keyof ReportSections {
+  return Object.prototype.hasOwnProperty.call(sectionLabels, section);
+}
+
+function reportSourceLabel(sourceType: string): string {
+  if (sourceType === "activity" || sourceType === "leaseflow_activity") return "업무 기록";
+  if (sourceType.includes("outlook")) return "이메일 자료";
+  return "확인 자료";
+}
+
+function reportMutationBusyAction(
+  action: ReportMutationAction,
+  decision?: "accept" | "reject",
+): BusyAction | null {
+  if (action !== "decide_patch") return action;
+  if (decision === "accept") return "patch-accept";
+  if (decision === "reject") return "patch-reject";
+  return null;
+}
+
+function reportMutationSuccessMessage(
+  action: ReportMutationAction,
+  decision?: "accept" | "reject",
+): string {
+  switch (action) {
+    case "draft":
+      return "현재 게시 정보를 기준으로 건물별 보고 초안을 만들었습니다.";
+    case "investigate":
+      return "저장된 이메일 자료에서 변경 후보를 준비했습니다. 근거와 비교해 주세요.";
+    case "decide_patch":
+      return decision === "accept"
+        ? "변경안을 보고 초안에 반영했습니다."
+        : "기존 보고 내용을 유지했습니다.";
+    case "approve":
+      return "담당자 승인을 완료했습니다. 이제 전달 기록을 남길 수 있습니다.";
+    case "send":
+      return "발송 기록을 저장했습니다. 실제 이메일은 전송하지 않았습니다.";
+  }
+}
+
+function reportNextStep(status: PublicReport["status"]): string {
+  if (status === "draft") return "내용 확인과 승인";
+  if (status === "approved") return "발송 기록";
+  return "처리 결과 확인";
+}
+
 export function ReportConsole({ reportRef }: { reportRef?: string }) {
   const { actorId, reload, reportError, reportWorkflow: workflow, workflow: adminWorkflow } = useAdminData();
   const [busy, setBusy] = useState<BusyAction | null>(null);
@@ -97,14 +149,17 @@ export function ReportConsole({ reportRef }: { reportRef?: string }) {
   async function mutate(action: ReportMutationAction, decision?: "accept" | "reject") {
     if (!workflow || busy) return;
     const report = selectReportByRef(workflow.reports, reportRef);
-    const busyKey: BusyAction = action === "decide_patch" ? `patch-${decision!}` : action;
+    const busyKey = reportMutationBusyAction(action, decision);
+    if (!busyKey) return;
     setBusy(busyKey);
     setNotice(null);
     try {
+      const buildingId = adminWorkflow?.state.publication_scope.building_id;
       const body = buildReportMutationBody({
         action,
         actorId,
         revision: workflow.revision,
+        ...(action === "draft" && buildingId ? { buildingId } : {}),
         ...(report ? { reportId: report.id } : {}),
         ...(decision ? { decision } : {}),
       });
@@ -112,14 +167,7 @@ export function ReportConsole({ reportRef }: { reportRef?: string }) {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error);
       await reload();
-      const messages = {
-        draft: "현재 게시 정보를 기준으로 건물별 보고 초안을 만들었습니다.",
-        investigate: "저장된 이메일 자료에서 변경 후보를 준비했습니다. 근거와 비교해 주세요.",
-        decide_patch: decision === "accept" ? "변경안을 보고 초안에 반영했습니다." : "기존 보고 내용을 유지했습니다.",
-        approve: "사람 승인을 완료했습니다. 이제 데모 발송 기록을 남길 수 있습니다.",
-        send: "발송 기록을 저장했습니다. 실제 이메일은 전송하지 않았습니다.",
-      };
-      setNotice({ tone: "success", message: messages[action] });
+      setNotice({ tone: "success", message: reportMutationSuccessMessage(action, decision) });
     } catch (error) {
       setNotice({ tone: "error", message: safeWorkflowError(error, "승인된 보고서") });
     } finally {
@@ -131,12 +179,12 @@ export function ReportConsole({ reportRef }: { reportRef?: string }) {
 
   if (!reportRef) return <ReportQueue reports={workflow.reports} canDraft={workflow.publication_stage === "published"} canPrepare={allowedActions.has("draft")} busy={busy} mutate={mutate} notice={notice} />;
   const report = selectReportByRef(workflow.reports, reportRef);
-  if (!report) return <><header className="lf-admin-page-header"><h1 tabIndex={-1}>임대인 보고서를 찾을 수 없습니다</h1></header><section aria-labelledby="missing-report-heading"><h2 id="missing-report-heading">보고 목록으로 돌아가기</h2><div className="lf-admin-feedback lf-admin-feedback--error" role="alert"><h3>선택한 보고서를 열 수 없습니다</h3><p>현재 합성 데모에 등록된 보고서가 아닙니다. 목록을 다시 불러와 실제 보고서를 선택해 주세요.</p><Link className="lf-admin-button" href="/reports">임대인 보고 목록</Link></div></section></>;
+  if (!report) return <><header className="lf-admin-page-header"><h1 tabIndex={-1}>임대인 보고서를 찾을 수 없습니다</h1></header><section aria-labelledby="missing-report-heading"><h2 id="missing-report-heading">보고 목록으로 돌아가기</h2><div className="lf-admin-feedback lf-admin-feedback--error" role="alert"><h3>선택한 보고서를 열 수 없습니다</h3><p>현재 데모에 등록된 보고서가 아닙니다. 목록을 다시 불러와 실제 보고서를 선택해 주세요.</p><Link className="lf-admin-button" href="/reports">임대인 보고 목록</Link></div></section></>;
   return <ReportDetail report={report} busy={busy} allowedActions={allowedActions} mutate={mutate} notice={notice} reload={reload} />;
 }
 
 function ReportQueue({ busy, canDraft, canPrepare, mutate, notice, reports }: { busy: BusyAction | null; canDraft: boolean; canPrepare: boolean; mutate: (action: "draft") => Promise<void>; notice: Notice | null; reports: PublicReport[] }) {
-  return <><header className="lf-admin-page-header"><h1 tabIndex={-1}>임대인 보고</h1><p>모든 보고는 외부용이며 건물별로 사람이 승인합니다.</p></header>{notice ? <ReportNotice notice={notice} /> : null}<section aria-labelledby="report-queue-heading"><div className="lf-admin-section-heading"><h2 id="report-queue-heading">준비할 보고</h2><span>{reports.length}건</span></div>{reports.length ? <ul className="lf-admin-queue">{reports.map((report) => <li key={report.id}><Link href={`/reports/${encodeURIComponent(report.id)}`}><div><h3>{report.building_label} 주간 보고</h3><p><time dateTime={report.reporting_period.from}>{formatDate(report.reporting_period.from)}</time>–<time dateTime={report.reporting_period.to}>{formatDate(report.reporting_period.to)}</time></p></div><dl><div><dt>상태</dt><dd>{reportStatusLabels[report.status]}</dd></div><div><dt>다음</dt><dd>{report.status === "draft" ? "내용 확인과 승인" : report.status === "approved" ? "발송 기록" : "처리 결과 확인"}</dd></div></dl></Link></li>)}</ul> : <div className="lf-admin-feedback"><h3>{canDraft ? "보고 초안을 만들 준비가 되었습니다" : "게시된 운영 정보가 필요합니다"}</h3><p>{canDraft ? "현재 게시·활성·외부 공유 가능한 정보만 사용해 초안을 만듭니다." : "승인·게시를 마치기 전에는 외부 보고를 만들 수 없습니다."}</p>{canDraft && canPrepare ? <button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("draft")} type="button">{busy ? "초안 만드는 중…" : "보고 초안 만들기"}</button> : canDraft ? <p className="lf-admin-permission">현재 역할은 보고를 읽을 수 있지만 초안을 만들 수 없습니다. 임대 관리 업무 역할이 필요합니다.</p> : <Link className="lf-admin-button" href="/publishing">승인·게시 확인</Link>}</div>}</section></>;
+  return <><header className="lf-admin-page-header"><h1 tabIndex={-1}>임대인 보고</h1></header>{notice ? <ReportNotice notice={notice} /> : null}<section aria-labelledby="report-queue-heading"><div className="lf-admin-section-heading"><h2 id="report-queue-heading">준비할 보고</h2><span>{reports.length}건</span></div>{reports.length ? <ul className="lf-admin-queue">{reports.map((report) => <li key={report.id}><Link href={`/reports/${encodeURIComponent(report.id)}`}><div><h3>{report.building_label} 주간 보고</h3><p><time dateTime={report.reporting_period.from}>{formatDate(report.reporting_period.from)}</time>–<time dateTime={report.reporting_period.to}>{formatDate(report.reporting_period.to)}</time></p></div><dl><div><dt>상태</dt><dd>{reportStatusLabels[report.status]}</dd></div><div><dt>다음</dt><dd>{reportNextStep(report.status)}</dd></div></dl></Link></li>)}</ul> : <div className="lf-admin-feedback"><h3>{canDraft ? "보고 초안을 만들 준비가 되었습니다" : "게시된 운영 정보가 필요합니다"}</h3><p>{canDraft ? "현재 게시·활성·외부 공유 가능한 정보만 사용해 초안을 만듭니다." : "승인·게시를 마치기 전에는 외부 보고를 만들 수 없습니다."}</p>{canDraft && canPrepare ? <button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("draft")} type="button">{busy ? "초안 만드는 중…" : "보고 초안 만들기"}</button> : canDraft ? <p className="lf-admin-permission">현재 역할은 보고를 읽을 수 있지만 초안을 만들 수 없습니다. 임대 관리 업무 역할이 필요합니다.</p> : <Link className="lf-admin-button" href="/publishing">승인·게시 확인</Link>}</div>}</section></>;
 }
 
 function ReportNotice({ notice }: { notice: Notice }) {
@@ -145,7 +193,7 @@ function ReportNotice({ notice }: { notice: Notice }) {
   return <div ref={noticeRef} tabIndex={-1} className={`lf-admin-feedback lf-admin-feedback--${notice.tone}`} role={notice.tone === "error" ? "alert" : undefined} aria-live={notice.tone === "success" ? "polite" : undefined}><h3>{notice.tone === "success" ? "보고 상태가 변경되었습니다" : "보고 작업을 완료하지 못했습니다"}</h3><p>{notice.message}</p></div>;
 }
 
-function ReportDetail({ allowedActions, busy, mutate, notice, reload, report }: { allowedActions: ReadonlySet<ReportWorkflow["allowedActions"][number]>; busy: BusyAction | null; mutate: (action: "approve" | "investigate" | "decide_patch" | "send", decision?: "accept" | "reject") => Promise<void>; notice: Notice | null; reload: () => Promise<void>; report: PublicReport }) {
+export function ReportDetail({ allowedActions, busy, mutate, notice, reload, report }: { allowedActions: ReadonlySet<ReportWorkflow["allowedActions"][number]>; busy: BusyAction | null; mutate: (action: "approve" | "investigate" | "decide_patch" | "send", decision?: "accept" | "reject") => Promise<void>; notice: Notice | null; reload: () => Promise<void>; report: PublicReport }) {
   const canInvestigate = allowedActions.has("investigate") && report.status === "draft" && !report.pending_candidate && report.accepted_patch_count === 0;
   const canAccept = allowedActions.has("decide_patch") && report.status === "patch_pending" && report.pending_candidate !== null && report.pending_candidate.unresolved.length === 0;
   const canApprove = allowedActions.has("approve") && report.status === "draft" && !report.pending_candidate && report.accepted_patch_count > 0 && report.unresolved.length === 0;
@@ -156,9 +204,9 @@ function ReportDetail({ allowedActions, busy, mutate, notice, reload, report }: 
     {report.status === "stale" ? <div className="lf-admin-feedback lf-admin-feedback--warning" role="alert"><h3>최신 기준으로 다시 확인해야 합니다</h3><p>게시 정보 또는 수신자 구성이 바뀌어 이 초안을 승인·발송할 수 없습니다. 최신 상태를 불러와 변경 범위를 확인해 주세요.</p><button className="lf-admin-button" onClick={() => void reload()} type="button">최신 상태 불러오기</button></div> : null}
     <div className="lf-admin-review-grid" aria-busy={busy !== null}><div>
       <section className="lf-admin-surface" aria-labelledby="report-content-heading"><h2 id="report-content-heading">보고 내용</h2><div className="lf-admin-report-sections">{(Object.keys(sectionLabels) as Array<keyof ReportSections>).map((key) => <section key={key}><h3>{sectionLabels[key]}</h3><ReportSection value={report.sections[key]} /></section>)}</div></section>
-      {report.pending_candidate ? <section className="lf-admin-surface lf-admin-evidence" aria-labelledby="report-patch-heading"><h2 id="report-patch-heading">근거와 변경 비교</h2><ul className="lf-admin-comparison">{report.pending_candidate.operations.map((operation, index) => <li key={`${operation.section}-${index}`}><h3>{sectionLabels[operation.section as keyof ReportSections] ?? "보고 항목"}</h3><div><dl><div><dt>현재 내용</dt><dd>{reportValue(operation.before)}</dd></div><div><dt>제안 내용</dt><dd>{reportValue(operation.after)}</dd></div></dl><p>출처 {operation.source_reference_ids.length}곳에서 확인</p></div></li>)}</ul>{report.pending_candidate.unresolved.length ? <div className="lf-admin-feedback lf-admin-feedback--warning" role="alert"><h3>추가 확인이 필요합니다</h3><p>해결되지 않은 근거가 있어 변경안 반영을 차단했습니다. 원문을 직접 확인해 주세요.</p></div> : null}</section> : null}
-      <section className="lf-admin-surface" aria-labelledby="report-delivery-heading"><h2 id="report-delivery-heading">수신자와 첨부</h2><dl className="lf-admin-facts"><div><dt>받는 사람</dt><dd>{report.recipients.to.map((item) => item.email).join(", ")}</dd></div><div><dt>참조</dt><dd>{report.recipients.cc.map((item) => item.email).join(", ")}</dd></div><div><dt>첨부</dt><dd>{report.attachments.map((item) => item.filename).join(", ") || "첨부 없음"}</dd></div></dl><p className="lf-admin-readonly">구성된 건물별 수신자 그룹입니다. 모델이 수신자를 만들지 않습니다.</p></section>
-      <section className="lf-admin-surface" aria-labelledby="report-source-heading"><h2 id="report-source-heading">확인한 자료</h2><ul className="lf-admin-file-list">{report.sources.map((source) => <li key={source.id}><h3>{source.source_type === "activity" || source.source_type === "leaseflow_activity" ? "업무 기록" : source.source_type.includes("outlook") ? "합성 이메일 자료" : "확인 자료"}</h3><p>{reportText(source.summary)}</p><time dateTime={source.occurred_at}>{formatDateTime(source.occurred_at)}</time></li>)}</ul></section>
+      {report.pending_candidate ? <section className="lf-admin-surface lf-admin-evidence" aria-labelledby="report-patch-heading"><h2 id="report-patch-heading">근거와 변경 비교</h2><ul className="lf-admin-comparison">{report.pending_candidate.operations.map((operation, index) => <li key={`${operation.section}-${index}`}><h3>{reportSectionLabel(operation.section)}</h3><div><dl><div><dt>현재 내용</dt><dd>{reportValue(operation.before)}</dd></div><div><dt>제안 내용</dt><dd>{reportValue(operation.after)}</dd></div></dl><p>출처 {operation.source_reference_ids.length}곳에서 확인</p></div></li>)}</ul>{report.pending_candidate.unresolved.length ? <div className="lf-admin-feedback lf-admin-feedback--warning" role="alert"><h3>추가 확인이 필요합니다</h3><p>해결되지 않은 근거가 있어 변경안 반영을 차단했습니다. 원문을 직접 확인해 주세요.</p></div> : null}</section> : null}
+      <section className="lf-admin-surface" aria-labelledby="report-delivery-heading"><h2 id="report-delivery-heading">수신자와 첨부</h2><dl className="lf-admin-facts"><div><dt>받는 사람</dt><dd>{report.recipients.to.map((item) => item.email).join(", ")}</dd></div><div><dt>참조</dt><dd>{report.recipients.cc.map((item) => item.email).join(", ")}</dd></div><div><dt>첨부</dt><dd>{report.attachments.map((item) => item.filename).join(", ") || "첨부 없음"}</dd></div></dl><p className="lf-admin-readonly">주간 보고 설정에 저장된 건물별 수신자입니다.</p></section>
+      <section className="lf-admin-surface" aria-labelledby="report-source-heading"><h2 id="report-source-heading">확인한 자료</h2><ul className="lf-admin-file-list">{report.sources.map((source) => <li key={source.id}><h3>{reportSourceLabel(source.source_type)}</h3><p>{reportText(source.summary)}</p><time dateTime={source.occurred_at}>{formatDateTime(source.occurred_at)}</time></li>)}</ul></section>
     </div><aside className="lf-admin-decision" aria-labelledby="report-decision-heading"><h2 id="report-decision-heading">승인과 전달</h2><span className="lf-admin-status lf-admin-status--info">{reportStatusLabels[report.status]}</span><p>현재 단계의 한 행동만 실행할 수 있습니다. 모든 외부 결과에는 사람 승인이 필요합니다.</p>
       {canInvestigate ? <button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("investigate")} type="button">{busy ? "자료 확인 중…" : "이메일 변동 확인"}</button> : canAccept ? <><button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("decide_patch", "accept")} type="button">{busy ? "반영 중…" : "변경안 반영"}</button><button className="lf-admin-button lf-admin-button--secondary" disabled={busy !== null} onClick={() => void mutate("decide_patch", "reject")} type="button">기존 내용 유지</button></> : canApprove ? <button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("approve")} type="button">{busy ? "승인 중…" : "보고서 승인"}</button> : canSend ? <button className="lf-admin-button" disabled={busy !== null} onClick={() => void mutate("send")} type="button">{busy ? "기록 중…" : "확인하고 발송 기록 남기기"}</button> : <p className="lf-admin-handoff">다음: {report.status === "sent" ? "발송·감사 기록에서 완료 확인" : report.status === "stale" ? "최신 기준 확인" : "현재 검토 조건 충족 대기"}</p>}
       {((report.status === "draft" && report.accepted_patch_count > 0) || report.status === "approved") && !isLmManager

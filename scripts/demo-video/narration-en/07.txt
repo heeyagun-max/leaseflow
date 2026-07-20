@@ -1,0 +1,1 @@
+Codex helped me move from conversations, real workflow corrections, and messy source examples to a tested product prototype. LeaseFlow is my first example of Codex for Everyone: AI adapts to the worker, instead of asking every worker to become an AI expert.
