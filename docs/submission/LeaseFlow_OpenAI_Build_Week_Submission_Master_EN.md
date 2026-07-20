@@ -29,13 +29,13 @@ Turn messy landlord documents and real user feedback into governed leasing workf
 Codex, GPT-5.6, TypeScript, Next.js, React, React Native, Expo, Zod, Vitest, Playwright
 
 **Project URL**  
-`[ADD FINAL STABLE ADMIN URL]`
+No durable hosted Admin URL is claimed for the single-process JSON demo. Judges can run the complete credential-free path from the public repository.
 
 **Mobile Web URL**  
-`[ADD FINAL STABLE MOBILE URL]`
+No durable hosted Mobile Web URL is claimed. The repository includes the Expo Web test surface and local judge instructions.
 
 **Demo video URL**  
-`[ADD PUBLIC YOUTUBE URL — UNDER 3:00]`
+`https://youtu.be/e9lG8biI8GY` — public, signed-out playback verified, 2:55.
 
 **Final local video artifact**  
 `artifacts/submission/LeaseFlow_OpenAI_Build_Week_Demo_EN.mp4` — 2:55, English narration, 1920×1080 H.264/AAC. Upload this exact file to YouTube and then replace the URL placeholder above.
@@ -54,7 +54,7 @@ Codex, GPT-5.6, TypeScript, Next.js, React, React Native, Expo, Zod, Vitest, Pla
 **Code repository — field 27948**  
 `https://github.com/heeyagun-max/leaseflow`
 
-The URL currently returns 404 without authentication, so treat it as private until public access is verified. Before submitting, either make the intended judge repository public with an appropriate license or grant access to both required judge accounts.
+Public access was verified without authentication on July 21, 2026. The final submission commit is `6b1e7554be92c304710c6e0de9bf78007a6a78a8` on `main`.
 
 **Project test link and instructions — field 27949**  
 
@@ -215,13 +215,13 @@ Skill location: `skills/codex-for-everyone/SKILL.md`
 
 ## 6. Final owner checklist
 
-- [ ] Confirm `Individual` and `Korea Republic of` in the Devpost custom fields.
-- [ ] Decide whether the project title will be `LeaseFlow: Codex for Everyone` or remain `LeaseFlow Copilot`; use one name everywhere.
-- [ ] Publish or share the repository with both judge accounts and verify access while signed out.
-- [ ] Perform a public-release audit so no real landlord documents, personal information, credentials, local paths, or private planning files are exposed.
-- [ ] Replace both stable demo URL placeholders after a clean-browser test from another network.
+- [x] Confirm `Individual` and `Korea Republic of` in the Devpost custom fields.
+- [x] Use `LeaseFlow: Codex for Everyone` consistently as the final project title.
+- [x] Publish the repository and verify unauthenticated access to `https://github.com/heeyagun-max/leaseflow`.
+- [x] Complete a public-release audit; private reference inputs and generated local artifacts remain ignored.
+- [x] State the deployment boundary instead of inventing stable Admin or Mobile URLs for the single-process demo.
 - [x] Render the English voiceover video under three minutes and verify the local MP4.
-- [ ] Upload `LeaseFlow_OpenAI_Build_Week_Demo_EN.mp4` to YouTube as Public, add the English SRT captions, and verify signed-out playback.
-- [ ] Capture the real Codex `/feedback` result for Session ID `019f7335-4b59-7e81-8131-b31800757887`.
-- [ ] Paste the exact form answers, reopen the saved Devpost draft, and check formatting and links.
-- [ ] Submit before Wednesday, July 22 at 9:00 AM KST and confirm the submitted timestamp.
+- [x] Upload `LeaseFlow_OpenAI_Build_Week_Demo_EN.mp4` to YouTube as Public and verify signed-out playback.
+- [x] Submit the required primary Codex `/feedback` Session ID `019f7335-4b59-7e81-8131-b31800757887`.
+- [x] Save the exact form answers, repository URL, and video URL in Devpost.
+- [x] Submit successfully at 2026-07-21 08:47:44 KST. Submission ID: `1083222`.

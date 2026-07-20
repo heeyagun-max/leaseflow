@@ -18,18 +18,13 @@ Checked items have repository or local verification evidence. Unchecked items re
 - [x] Primary Codex session ID `019f7335-4b59-7e81-8131-b31800757887` is recorded.
 - [x] Event-period implementation commits are recorded through `b7f7e90`.
 
-## External actions still required
+## External submission status
 
-- [ ] Join or confirm the Devpost project and select `Work & Productivity`. Owner: submission owner. Action: verify the project settings in Devpost.
-- [ ] Confirm the repository is judge-accessible. Owner: repository owner. Action: provide a public URL or invite the required judge accounts if it remains private.
-- [ ] Complete a public-release data audit. Owner: repository owner. Action: exclude any private planning/reference materials from the judge-accessible repository or deployment; do not rely only on the synthetic runtime boundary.
-- [ ] Publish and test the Admin judge URL. Owner: deployment owner. Action: replace `[PENDING: public judge URL]` only after a clean-browser smoke test.
-- [ ] Publish and test the Mobile Web judge URL. Owner: deployment owner. Action: build it with the final public HTTPS Admin origin, then run a clean-browser smoke test.
-- [ ] Add the final repository URL. Owner: repository owner. Action: replace `[PENDING: public or judge-accessible repository URL]` after access is verified.
-- [ ] Push or otherwise publish the judge-accessible repository package. Owner: repository owner. Action: verify that the intended MP4 is included and forbidden local/reference paths are absent.
-- [ ] Upload the video and verify public playback with narration. Owner: video owner. Action: replace `[PENDING: public narrated video URL, 3:00 maximum]` only after playback succeeds while signed out.
-- [ ] Capture the Codex `/feedback` UI evidence required by the event, if applicable. Owner: submission owner. Action: capture the real UI and associate it with the recorded session ID; do not manufacture a feedback URL or screenshot.
-- [ ] Decide whether to demonstrate the optional live OpenAI adapter. Owner: technical/submission owner. Action: if used, provide server-only credentials, set an available `OPENAI_MODEL`, run and record the three live paths, and keep `store: false`; otherwise keep the deterministic-demo wording and make no live-call claim.
-- [ ] Review every final form field and replace all bracketed placeholders. Owner: submission owner. Action: search for `PENDING:` before submission.
-- [ ] Save the Devpost draft and re-open it before the deadline. Owner: submission owner. Action: verify formatting, links, video playback, track, and team membership.
-- [ ] Submit the final entry. Owner: submission owner. Action: confirm Devpost shows the submitted state and timestamp.
+- [x] Devpost project submitted to `Work & Productivity` as an individual from `Korea Republic of`.
+- [x] Public repository verified: `https://github.com/heeyagun-max/leaseflow`, final submission commit `6b1e7554be92c304710c6e0de9bf78007a6a78a8` on `main`.
+- [x] Public-release audit completed; private source inputs and local generated artifacts are excluded by repository rules.
+- [x] Public YouTube demo verified while signed out: `https://youtu.be/e9lG8biI8GY`.
+- [x] Required Codex Session ID submitted: `019f7335-4b59-7e81-8131-b31800757887`.
+- [x] Devpost submission confirmed as `Submitted` at 2026-07-21 08:47:44 KST. Submission ID: `1083222`.
+- [x] Deployment boundary stated honestly: no durable hosted Admin or Mobile URL is claimed for the single-process JSON demo; judges receive credential-free local instructions.
+- [x] Optional live OpenAI adapter remains unclaimed; the verified judge path is deterministic, synthetic, and credential-free.
